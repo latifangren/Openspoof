@@ -1,0 +1,12 @@
+# OpenSpoof Phase 4 — SELinux allowances for Dobby inline hooks.
+#
+# Inline hooking needs:
+#   - anonymous RWX pages for trampolines      -> process execmem
+#   - mprotect(PROT_WRITE|PROT_EXEC) on .text  -> handled via execmem on most ROMs
+#
+# TEMPLATE — validate on your device after running a configured app:
+#   adb shell dmesg | grep 'avc:' | grep denied
+# then tighten the domain below to what your ROM actually reports.
+# Without a working rule, DobbyHook fails gracefully (logged, not fatal).
+
+allow untrusted_app untrusted_app process execmem

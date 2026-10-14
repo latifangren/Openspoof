@@ -1,0 +1,8 @@
+id=openspoof
+name=OpenSpoof
+version=v0.1.0
+versionCode=1
+author=latifangren
+description=Per-app device & CPU spoofing for games/apps. Open source, free, no license server.
+updateJson=
+minMagisk=23000

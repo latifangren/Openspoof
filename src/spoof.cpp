@@ -152,6 +152,58 @@ void spoofAndroidId(JNIEnv* env, const std::string& androidId) {
     }
 }
 
+// --- Phase C: DRM / Widevine Spoofing via JNI RegisterNatives ----------------
+static std::string g_drm_security_level;
+static std::string g_drm_vendor;
+static std::string g_drm_version;
+static std::string g_drm_system_id;
+
+jstring JNICALL fake_MediaDrm_getPropertyString(JNIEnv* env, jobject, jstring name) {
+    if (name != nullptr) {
+        const char* str = env->GetStringUTFChars(name, nullptr);
+        std::string prop = str ? str : "";
+        if (str) env->ReleaseStringUTFChars(name, str);
+
+        if (prop == "securityLevel" && !g_drm_security_level.empty()) {
+            return env->NewStringUTF(g_drm_security_level.c_str());
+        }
+        if (prop == "vendor" && !g_drm_vendor.empty()) {
+            return env->NewStringUTF(g_drm_vendor.c_str());
+        }
+        if (prop == "version" && !g_drm_version.empty()) {
+            return env->NewStringUTF(g_drm_version.c_str());
+        }
+        if (prop == "systemId" && !g_drm_system_id.empty()) {
+            return env->NewStringUTF(g_drm_system_id.c_str());
+        }
+    }
+    return nullptr;
+}
+
+void installMediaDrmHook(JNIEnv* env, const DrmConfig& drm) {
+    if (!drm.enabled() || env == nullptr) return;
+    g_drm_security_level = drm.securityLevel;
+    g_drm_vendor = drm.vendor;
+    g_drm_version = drm.version;
+    g_drm_system_id = drm.systemId;
+
+    jclass cls = env->FindClass("android/media/MediaDrm");
+    if (cls == nullptr) {
+        env->ExceptionClear();
+        return;
+    }
+    JNINativeMethod method = {
+        const_cast<char*>("getPropertyString"),
+        const_cast<char*>("(Ljava/lang/String;)Ljava/lang/String;"),
+        reinterpret_cast<void*>(fake_MediaDrm_getPropertyString)
+    };
+    if (env->RegisterNatives(cls, &method, 1) == 0) {
+        LOGD("installed MediaDrm.getPropertyString hook via RegisterNatives");
+    } else {
+        env->ExceptionClear();
+    }
+}
+
 }  // namespace
 
 class OpenSpoof : public zygisk::ModuleBase {
@@ -179,9 +231,12 @@ public:
             return;
         }
         androidId_ = p->nativeHooks.id.androidId;
+        drm_ = p->nativeHooks.drm;
+
         spoofCpuinfo(it->second);  // Phase 2 (no-op when no cpuinfo file for profile)
         spoofBuild(env_, *p);      // Phase 1
         spoofAndroidId(env_, androidId_); // Phase B (early attempt)
+        installMediaDrmHook(env_, drm_);  // Phase C (early attempt)
         openspoof::InstallNativeHooks(p->nativeHooks);  // Phase 4 & PRO
         LOGD("spoofed %s as profile '%s'", process.c_str(), it->second.c_str());
     }
@@ -190,12 +245,16 @@ public:
         if (!androidId_.empty()) {
             spoofAndroidId(env_, androidId_); // Phase B (post-init attempt)
         }
+        if (drm_.enabled()) {
+            installMediaDrmHook(env_, drm_);  // Phase C (post-init attempt)
+        }
     }
 
 private:
     Api* api_ = nullptr;
     JNIEnv* env_ = nullptr;
     std::string androidId_;
+    DrmConfig drm_;
 };
 
 REGISTER_ZYGISK_MODULE(OpenSpoof)

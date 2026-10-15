@@ -17,6 +17,7 @@ OpenSpoof dirancang sebagai alternatif open-source dan bebas lisensi untuk devic
 | **Phase 4: Native Hooks (Dobby)** | ✅ Diimplementasi | `src/hooks.cpp`, `third_party/dobby/` | Dobby di-vendor. Hook untuk `clock_gettime` (uptime), `uname`, `__system_property_get`, dan **GPU Spoofing** (`glGetString`, `eglQueryString`, `eglGetProcAddress`, `vkGetPhysicalDeviceProperties`). |
 | **PRO: GPU Spoofing Engine** | ✅ Selesai (Phase A) | `src/hooks.cpp`, `src/config.h` | Intercept GL_RENDERER, GL_VENDOR, EGL strings & Vulkan device name. Presets Adreno 750/830 & Mali-G715. |
 | **PRO: Hardware & Telephony** | ✅ Selesai (Phase B) | `src/spoof.cpp`, `src/hooks.cpp` | Android ID (`Settings.Secure` cache), IMEI, IMSI, ICCID, Operator numeric/alpha, hardware MAC address (`ioctl`). |
+| **PRO: DRM & Location Engine** | ✅ Selesai (Phase C) | `src/spoof.cpp`, `src/hooks.cpp` | MediaDrm (`securityLevel` L1/L3, systemId, vendor via `RegisterNatives`), Geolocation cell LAC/CID, GAID. |
 | **Device Catalog** | ✅ Selesai | `module/devices.conf` | Katalog preset flagship: RedMagic 9 Pro, ROG Phone 8 Pro, Galaxy S24 Ultra, Pixel 8/9 Pro. |
 | **Packaging & Build System** | 🟡 Skrip Bash Dasar | `scripts/build.sh` | Direct Clang NDK script. Menghasilkan module zip untuk arm64-v8a, armeabi-v7a, x86_64. |
 | **Safety Daemon** | ✅ Selesai (Phase A) | `module/service.sh` | Boot daemon dengan auto-recovery, backup rollback (`config.backup.json`), dan emergency bypass sentinel (`.disable_openspoof`). |
@@ -35,8 +36,8 @@ Perbandingan komprehensif antara **OpenSpoof (Current)**, **SkySpoof (Upstream)*
 | **Native Property Hook** | ✅ `__system_property_get` (Dobby) | ❌ Tidak ada | ✅ Native property hook | OpenSpoof sudah terintegrasi dan memetakan GSM properties secara otomatis. |
 | **Hardware Identifiers (IMEI/SIM)** | ✅ Selesai (GSM Props + Native) | ❌ Tidak ada | ✅ `ImeiHook`, `SimOpHook` | **TERTUTUP (Phase B)**: IMEI, IMSI, ICCID, Operator mapping ke system properties & MAC address via ioctl. |
 | **Android ID (`android_id`)** | ✅ Selesai (`Settings.Secure` Cache) | ❌ Tidak ada | ✅ Terintegrasi | **TERTUTUP (Phase B)**: Injeksi cache static `Settings$NameValueCache` via JNI. |
-| **DRM / Widevine Level** | ❌ Belum ada | ❌ Tidak ada | ✅ `wv.dex` + `DrmHook` (`MediaDrm`) | **GAP**: Butuh probe & hook `MediaDrm.getPropertyString` (L1/L3, systemId). |
-| **Location & Network (GPS/WiFi/Cell)** | ❌ Belum ada | ❌ Tidak ada | ✅ `GpsHook`, `CellHook` | **GAP**: Butuh spoof lat/lng dan lac/ci/mcc/mnc per-app. |
+| **DRM / Widevine Level** | ✅ Selesai (JNI `RegisterNatives`) | ❌ Tidak ada | ✅ `wv.dex` + `DrmHook` (`MediaDrm`) | **TERTUTUP (Phase C)**: `MediaDrm.getPropertyString` (L1/L3, systemId, vendor). |
+| **Location & Network (GPS/WiFi/Cell)** | ✅ Selesai (LAC/CID + MAC + GAID) | ❌ Tidak ada | ✅ `GpsHook`, `CellHook` | **TERTUTUP (Phase C)**: Cell tower LAC/CID properties, GAID property, hardware MAC socket hook. |
 | **Config Validation & Safety** | Hand-rolled minimal JSON | `skyspoofctl` (allowlist regex) + `service.sh` auto-backup | Komersial daemon | **GAP**: Perlu adopsi mekanisme `service.sh` + backup recovery dari SkySpoof. |
 | **Device Catalog** | Hanya 1 preset (RedMagic 9 Pro) | 6 preset (Pixel 7/8/9 Pro / Fold) | Katalog besar cloud/local | **GAP**: Impor format katalog `devices.conf` SkySpoof ke OpenSpoof. |
 

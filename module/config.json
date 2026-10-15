@@ -36,7 +36,22 @@
         },
         "id": {
           "android_id": "7b39a48f10c2e5d9",
-          "mac_address": "02:42:AC:11:00:2A"
+          "mac_address": "02:42:AC:11:00:2A",
+          "gaid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "drm": {
+          "security_level": "L1",
+          "vendor": "Google",
+          "version": "16.0.0",
+          "system_id": "4266"
+        },
+        "location": {
+          "latitude": "37.7749",
+          "longitude": "-122.4194",
+          "altitude": "15.0",
+          "accuracy": "5.0",
+          "lac": "12345",
+          "cid": "67890"
         },
         "props": {
           "ro.product.brand": "nubia",

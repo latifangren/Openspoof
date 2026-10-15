@@ -273,8 +273,24 @@ bool InstallNativeHooks(const NativeHooks& h) {
         g_props["gsm.sim.state"] = "LOADED";
     }
 
-    // F4c: __system_property_get (must be installed if custom props or telephony configured)
-    if (!h.props.empty() || h.telephony.enabled()) {
+    // Phase C: Geolocation Cell Tower properties
+    if (h.location.enabled()) {
+        if (h.location.lac != 0) {
+            g_props["gsm.cell.lac"] = std::to_string(h.location.lac);
+        }
+        if (h.location.cid != 0) {
+            g_props["gsm.cell.cid"] = std::to_string(h.location.cid);
+        }
+    }
+
+    // Phase C: GAID (Google Advertising ID)
+    if (h.id.enabled() && !h.id.gaid.empty()) {
+        g_props["ro.advertising.id"] = h.id.gaid;
+        g_props["persist.sys.advertising_id"] = h.id.gaid;
+    }
+
+    // F4c: __system_property_get (must be installed if custom props, telephony, location, or GAID configured)
+    if (!h.props.empty() || h.telephony.enabled() || h.location.enabled() || (h.id.enabled() && !h.id.gaid.empty())) {
         for (const auto& kv : h.props) {
             g_props[kv.first] = kv.second;
         }

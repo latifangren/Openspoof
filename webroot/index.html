@@ -142,8 +142,30 @@ function render() {
           <input data-nh="imei" value="${esc(nh.telephony?.imei || "")}" placeholder="15 digits" style="width:180px"></div>
         <div class="row"><span class="prof grow">SIM Operator</span>
           <input data-nh="sim-op" value="${esc(nh.telephony?.sim_operator || "")}" placeholder="310260" style="width:180px"></div>
-        <div class="row"><span class="prof grow">Operator Name</span>
-          <input data-nh="sim-name" value="${esc(nh.telephony?.sim_operator_name || "")}" placeholder="T-Mobile" style="width:180px"></div>
+        <div class="row"><span class="prof grow">Google Ad ID (GAID)</span>
+          <input data-nh="gaid" value="${esc(nh.id?.gaid || "")}" placeholder="a1b2c3d4-e5f6-..." style="width:180px"></div>
+        <div class="prof" style="margin-top:8px; color:#f43f5e">🎬 Widevine / DRM (PRO Tier)</div>
+        <div class="row"><span class="prof grow">Security Level</span>
+          <select data-nh="drm-sec" style="width:180px">
+            <option value=""${!nh.drm?.security_level ? " selected" : ""}>Default / None</option>
+            <option value="L1"${nh.drm?.security_level === "L1" ? " selected" : ""}>L1 (Hardware/HD)</option>
+            <option value="L3"${nh.drm?.security_level === "L3" ? " selected" : ""}>L3 (Software/SD)</option>
+          </select></div>
+        <div class="row"><span class="prof grow">DRM System ID</span>
+          <input data-nh="drm-sysid" value="${esc(nh.drm?.system_id || "")}" placeholder="4266" style="width:180px"></div>
+        <div class="row"><span class="prof grow">DRM Vendor</span>
+          <input data-nh="drm-vendor" value="${esc(nh.drm?.vendor || "")}" placeholder="Google" style="width:180px"></div>
+        <div class="prof" style="margin-top:8px; color:#10b981">📍 Geolocation &amp; Cell (PRO Tier)</div>
+        <div class="row"><span class="prof grow">Latitude</span>
+          <input data-nh="loc-lat" type="number" step="any" value="${nh.location?.latitude ?? ""}" placeholder="37.7749" style="width:180px"></div>
+        <div class="row"><span class="prof grow">Longitude</span>
+          <input data-nh="loc-lng" type="number" step="any" value="${nh.location?.longitude ?? ""}" placeholder="-122.4194" style="width:180px"></div>
+        <div class="row"><span class="prof grow">Cell LAC / CID</span>
+          <div class="row" style="margin:0; width:180px; gap:4px">
+            <input data-nh="loc-lac" type="number" value="${nh.location?.lac ?? ""}" placeholder="LAC" style="width:88px">
+            <input data-nh="loc-cid" type="number" value="${nh.location?.cid ?? ""}" placeholder="CID" style="width:88px">
+          </div>
+        </div>
         <div class="prof" style="margin-top:8px">⚙️ System &amp; Uptime</div>
         <div class="row"><span class="prof grow">Uptime offset (sec)</span>
           <input data-nh="uptime" type="number" value="${nh.uptime_offset_sec ?? ""}" placeholder="e.g. 172800" style="width:180px"></div>
@@ -156,7 +178,7 @@ function render() {
         <div class="row"><button data-addprop>Add prop</button></div>
       </details>`;
     const q = s => d.querySelector(s);
-    nh.id ||= {}; nh.telephony ||= {};
+    nh.id ||= {}; nh.telephony ||= {}; nh.drm ||= {}; nh.location ||= {};
     q('[data-nh="android-id"]').onchange = e => {
       nh.id.android_id = e.target.value.trim();
       if (!nh.id.android_id) delete nh.id.android_id;
@@ -164,6 +186,38 @@ function render() {
     q('[data-nh="mac"]').onchange = e => {
       nh.id.mac_address = e.target.value.trim();
       if (!nh.id.mac_address) delete nh.id.mac_address;
+    };
+    q('[data-nh="gaid"]').onchange = e => {
+      nh.id.gaid = e.target.value.trim();
+      if (!nh.id.gaid) delete nh.id.gaid;
+    };
+    q('[data-nh="drm-sec"]').onchange = e => {
+      nh.drm.security_level = e.target.value;
+      if (!nh.drm.security_level) delete nh.drm.security_level;
+    };
+    q('[data-nh="drm-sysid"]').onchange = e => {
+      nh.drm.system_id = e.target.value.trim();
+      if (!nh.drm.system_id) delete nh.drm.system_id;
+    };
+    q('[data-nh="drm-vendor"]').onchange = e => {
+      nh.drm.vendor = e.target.value.trim();
+      if (!nh.drm.vendor) delete nh.drm.vendor;
+    };
+    q('[data-nh="loc-lat"]').onchange = e => {
+      const v = parseFloat(e.target.value);
+      if (isNaN(v)) delete nh.location.latitude; else nh.location.latitude = v;
+    };
+    q('[data-nh="loc-lng"]').onchange = e => {
+      const v = parseFloat(e.target.value);
+      if (isNaN(v)) delete nh.location.longitude; else nh.location.longitude = v;
+    };
+    q('[data-nh="loc-lac"]').onchange = e => {
+      const v = parseInt(e.target.value, 10);
+      if (isNaN(v)) delete nh.location.lac; else nh.location.lac = v;
+    };
+    q('[data-nh="loc-cid"]').onchange = e => {
+      const v = parseInt(e.target.value, 10);
+      if (isNaN(v)) delete nh.location.cid; else nh.location.cid = v;
     };
     q('[data-nh="imei"]').onchange = e => {
       nh.telephony.imei = e.target.value.trim();

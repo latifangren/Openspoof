@@ -39,13 +39,40 @@ struct TelephonyConfig {
     }
 };
 
-// Phase B: Hardware & System Identifiers (Android ID, MAC)
+// Phase B: Hardware & System Identifiers (Android ID, MAC, GAID)
 struct IdentifierConfig {
     std::string androidId;          // 16-hex digit Android ID
     std::string macAddress;         // e.g. "00:1A:2B:3C:4D:5E"
+    std::string gaid;               // Google Advertising ID (UUID)
 
     bool enabled() const {
-        return !androidId.empty() || !macAddress.empty();
+        return !androidId.empty() || !macAddress.empty() || !gaid.empty();
+    }
+};
+
+// Phase C: DRM / Widevine Spoofing (MediaDrm)
+struct DrmConfig {
+    std::string securityLevel;      // e.g. "L1" or "L3"
+    std::string vendor;             // e.g. "Google"
+    std::string version;            // e.g. "16.0.0"
+    std::string systemId;           // e.g. "4266"
+
+    bool enabled() const {
+        return !securityLevel.empty() || !systemId.empty() || !vendor.empty();
+    }
+};
+
+// Phase C: Location & Geolocation Spoofing (GPS & Cell Tower)
+struct LocationConfig {
+    double latitude = 0.0;          // e.g. 37.7749
+    double longitude = 0.0;         // e.g. -122.4194
+    double altitude = 0.0;          // e.g. 15.0
+    float accuracy = 0.0f;          // e.g. 5.0f
+    int lac = 0;                    // Location Area Code
+    int cid = 0;                    // Cell ID
+
+    bool enabled() const {
+        return latitude != 0.0 || longitude != 0.0 || lac != 0 || cid != 0;
     }
 };
 
@@ -56,12 +83,15 @@ struct NativeHooks {
     std::map<std::string, std::string> props;  // F4c: key -> spoofed value
     GpuConfig gpu;                             // F4e: GPU / OpenGL / EGL / Vulkan
     TelephonyConfig telephony;                  // Phase B: Telephony & SIM
-    IdentifierConfig id;                       // Phase B: Android ID & MAC
+    IdentifierConfig id;                       // Phase B: Android ID, MAC, GAID
+    DrmConfig drm;                             // Phase C: DRM & Widevine
+    LocationConfig location;                   // Phase C: GPS & Cell Tower
 
     bool enabled() const {
         return uptimeOffsetSec != 0 || !unameMachine.empty() ||
                !unameSysname.empty() || !props.empty() || gpu.enabled() ||
-               telephony.enabled() || id.enabled();
+               telephony.enabled() || id.enabled() || drm.enabled() ||
+               location.enabled();
     }
 };
 
@@ -227,6 +257,29 @@ inline void fillProfile(Profile& p, const Value& obj) {
         if (idObj != o.object.end() && idObj->second.isObject) {
             p.nativeHooks.id.androidId = get(idObj->second, "android_id");
             p.nativeHooks.id.macAddress = get(idObj->second, "mac_address");
+            p.nativeHooks.id.gaid = get(idObj->second, "gaid");
+        }
+        auto drmObj = o.object.find("drm");
+        if (drmObj != o.object.end() && drmObj->second.isObject) {
+            p.nativeHooks.drm.securityLevel = get(drmObj->second, "security_level");
+            p.nativeHooks.drm.vendor = get(drmObj->second, "vendor");
+            p.nativeHooks.drm.version = get(drmObj->second, "version");
+            p.nativeHooks.drm.systemId = get(drmObj->second, "system_id");
+        }
+        auto locObj = o.object.find("location");
+        if (locObj != o.object.end() && locObj->second.isObject) {
+            std::string lat = get(locObj->second, "latitude");
+            if (!lat.empty()) { try { p.nativeHooks.location.latitude = std::stod(lat); } catch (...) {} }
+            std::string lng = get(locObj->second, "longitude");
+            if (!lng.empty()) { try { p.nativeHooks.location.longitude = std::stod(lng); } catch (...) {} }
+            std::string alt = get(locObj->second, "altitude");
+            if (!alt.empty()) { try { p.nativeHooks.location.altitude = std::stod(alt); } catch (...) {} }
+            std::string acc = get(locObj->second, "accuracy");
+            if (!acc.empty()) { try { p.nativeHooks.location.accuracy = std::stof(acc); } catch (...) {} }
+            std::string lac = get(locObj->second, "lac");
+            if (!lac.empty()) { try { p.nativeHooks.location.lac = std::stoi(lac); } catch (...) {} }
+            std::string cid = get(locObj->second, "cid");
+            if (!cid.empty()) { try { p.nativeHooks.location.cid = std::stoi(cid); } catch (...) {} }
         }
     }
 }

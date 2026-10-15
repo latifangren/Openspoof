@@ -134,7 +134,9 @@ new_test() {
   LOGFILE="$TMPDIR_TEST/log"
   STUB_LOG="$TMPDIR_TEST/stub.log"
   KERNELSU_LOG="$TMPDIR_TEST/ksu.log"
-  cd "$TMPDIR_TEST"
+  # Bail out if cd fails so ShellCheck SC2164 is satisfied and a broken
+  # test sandbox cannot silently corrupt later assertions.
+  cd "$TMPDIR_TEST" || exit 1
   # Re-export so any later mktemp call (in helpers) also stays scoped.
   # STUB_LOG is also exported so policy-tool stubs (written by make_tool)
   # can find it when the helper invokes them.

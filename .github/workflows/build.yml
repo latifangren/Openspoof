@@ -60,12 +60,19 @@ jobs:
           ./tests/run.sh
 
       # Cheap static check: catch syntax errors in C++ without paying
-      # for a full NDK build. Runs against the host compiler; bionic-
-      # specific headers are guarded by #ifdef in the sources we ship,
-      # so a syntax pass is meaningful for the JNI / Dobby glue.
-      - name: C++ syntax check (host clang)
+      # for a full NDK build. The host clang binary is used (faster
+      # than the NDK toolchain), but the NDK sysroot usr/include
+      # directory is added so jni.h and android/log.h resolve. The
+      # __ANDROID_API__ macro matches the build target (android-21) so
+      # version-gated declarations in the headers compile.
+      - name: C++ syntax check (host clang + NDK sysroot)
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
-          clang++ -fsyntax-only -std=c++17 -Wall -Wextra -I src \
+          clang++ -fsyntax-only -std=c++17 -Wall -Wextra \
+            -I src \
+            -I "$ANDROID_NDK_HOME/sysroot/usr/include" \
+            -D__ANDROID_API__=21 \
             src/spoof.cpp src/hooks.cpp 2>&1 | tee cxx-syntax.log
 
       # Lint the shell scripts that ship in module/, scripts/, and tests/.

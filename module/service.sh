@@ -1,10 +1,10 @@
 #!/system/bin/sh
 # OpenSpoof boot-time safety & recovery daemon
 MODDIR=${0%/*}
-DATA=/data/adb/modules/openspoof
-CONFIG=$DATA/config.json
-BACKUP=$DATA/config.backup.json
-DISABLE=$DATA/.disable_openspoof
+CONFIG=$MODDIR/config.json
+BACKUP=$MODDIR/config.backup.json
+TEMPLATE=$MODDIR/config.default.json
+DISABLE=$MODDIR/.disable_openspoof
 
 # 1. Emergency disable sentinel
 if [ -f "$DISABLE" ]; then
@@ -14,8 +14,8 @@ fi
 
 # 2. Ensure config.json exists
 if [ ! -f "$CONFIG" ]; then
-  if [ -f "$MODDIR/config.json" ]; then
-    cp "$MODDIR/config.json" "$CONFIG" 2>/dev/null || true
+  if [ -f "$TEMPLATE" ]; then
+    cp "$TEMPLATE" "$CONFIG" 2>/dev/null || true
     chmod 0600 "$CONFIG" 2>/dev/null || true
     log -t OpenSpoof "Initialized default config.json from template"
   fi
@@ -35,12 +35,10 @@ if ! is_valid_json "$CONFIG"; then
     cp "$BACKUP" "$CONFIG"
     chmod 0600 "$CONFIG" 2>/dev/null || true
     log -t OpenSpoof "Successfully recovered config.json from backup"
-  else
-    if [ -f "$MODDIR/config.json" ]; then
-      cp "$MODDIR/config.json" "$CONFIG"
-      chmod 0600 "$CONFIG" 2>/dev/null || true
-      log -t OpenSpoof "Restored default config.json from module template"
-    fi
+  elif [ -f "$TEMPLATE" ]; then
+    cp "$TEMPLATE" "$CONFIG"
+    chmod 0600 "$CONFIG" 2>/dev/null || true
+    log -t OpenSpoof "Restored default config.json from template"
   fi
 else
   # Config is healthy -> update backup

@@ -153,12 +153,13 @@ void spoofAndroidId(JNIEnv* env, const std::string& androidId) {
 }
 
 // --- Phase C: DRM / Widevine Spoofing via JNI RegisterNatives ----------------
+static jstring (*orig_MediaDrm_getPropertyString)(JNIEnv*, jobject, jstring) = nullptr;
 static std::string g_drm_security_level;
 static std::string g_drm_vendor;
 static std::string g_drm_version;
 static std::string g_drm_system_id;
 
-jstring JNICALL fake_MediaDrm_getPropertyString(JNIEnv* env, jobject, jstring name) {
+jstring JNICALL fake_MediaDrm_getPropertyString(JNIEnv* env, jobject thiz, jstring name) {
     if (name != nullptr) {
         const char* str = env->GetStringUTFChars(name, nullptr);
         std::string prop = str ? str : "";
@@ -177,6 +178,9 @@ jstring JNICALL fake_MediaDrm_getPropertyString(JNIEnv* env, jobject, jstring na
             return env->NewStringUTF(g_drm_system_id.c_str());
         }
     }
+    if (orig_MediaDrm_getPropertyString != nullptr) {
+        return orig_MediaDrm_getPropertyString(env, thiz, name);
+    }
     return nullptr;
 }
 
@@ -186,6 +190,14 @@ void installMediaDrmHook(JNIEnv* env, const DrmConfig& drm) {
     g_drm_vendor = drm.vendor;
     g_drm_version = drm.version;
     g_drm_system_id = drm.systemId;
+
+    if (orig_MediaDrm_getPropertyString == nullptr) {
+        void* handle = dlopen("libmedia_jni.so", RTLD_NOW);
+        if (handle != nullptr) {
+            orig_MediaDrm_getPropertyString = reinterpret_cast<jstring (*)(JNIEnv*, jobject, jstring)>(
+                dlsym(handle, "android_media_MediaDrm_getPropertyString"));
+        }
+    }
 
     jclass cls = env->FindClass("android/media/MediaDrm");
     if (cls == nullptr) {

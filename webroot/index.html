@@ -142,6 +142,8 @@ function render() {
           <input data-nh="imei" value="${esc(nh.telephony?.imei || "")}" placeholder="15 digits" style="width:180px"></div>
         <div class="row"><span class="prof grow">SIM Operator</span>
           <input data-nh="sim-op" value="${esc(nh.telephony?.sim_operator || "")}" placeholder="310260" style="width:180px"></div>
+        <div class="row"><span class="prof grow">Operator Name</span>
+          <input data-nh="sim-name" value="${esc(nh.telephony?.sim_operator_name || "")}" placeholder="T-Mobile" style="width:180px"></div>
         <div class="row"><span class="prof grow">Google Ad ID (GAID)</span>
           <input data-nh="gaid" value="${esc(nh.id?.gaid || "")}" placeholder="a1b2c3d4-e5f6-..." style="width:180px"></div>
         <div class="prof" style="margin-top:8px; color:#f43f5e">🎬 Widevine / DRM (PRO Tier)</div>
@@ -178,83 +180,84 @@ function render() {
         <div class="row"><button data-addprop>Add prop</button></div>
       </details>`;
     const q = s => d.querySelector(s);
+    const onch = (s, fn) => { const el = q(s); if (el) el.onchange = fn; };
     nh.id ||= {}; nh.telephony ||= {}; nh.drm ||= {}; nh.location ||= {};
-    q('[data-nh="android-id"]').onchange = e => {
+    onch('[data-nh="android-id"]', e => {
       nh.id.android_id = e.target.value.trim();
       if (!nh.id.android_id) delete nh.id.android_id;
-    };
-    q('[data-nh="mac"]').onchange = e => {
+    });
+    onch('[data-nh="mac"]', e => {
       nh.id.mac_address = e.target.value.trim();
       if (!nh.id.mac_address) delete nh.id.mac_address;
-    };
-    q('[data-nh="gaid"]').onchange = e => {
+    });
+    onch('[data-nh="gaid"]', e => {
       nh.id.gaid = e.target.value.trim();
       if (!nh.id.gaid) delete nh.id.gaid;
-    };
-    q('[data-nh="drm-sec"]').onchange = e => {
+    });
+    onch('[data-nh="drm-sec"]', e => {
       nh.drm.security_level = e.target.value;
       if (!nh.drm.security_level) delete nh.drm.security_level;
-    };
-    q('[data-nh="drm-sysid"]').onchange = e => {
+    });
+    onch('[data-nh="drm-sysid"]', e => {
       nh.drm.system_id = e.target.value.trim();
       if (!nh.drm.system_id) delete nh.drm.system_id;
-    };
-    q('[data-nh="drm-vendor"]').onchange = e => {
+    });
+    onch('[data-nh="drm-vendor"]', e => {
       nh.drm.vendor = e.target.value.trim();
       if (!nh.drm.vendor) delete nh.drm.vendor;
-    };
-    q('[data-nh="loc-lat"]').onchange = e => {
+    });
+    onch('[data-nh="loc-lat"]', e => {
       const v = parseFloat(e.target.value);
       if (isNaN(v)) delete nh.location.latitude; else nh.location.latitude = v;
-    };
-    q('[data-nh="loc-lng"]').onchange = e => {
+    });
+    onch('[data-nh="loc-lng"]', e => {
       const v = parseFloat(e.target.value);
       if (isNaN(v)) delete nh.location.longitude; else nh.location.longitude = v;
-    };
-    q('[data-nh="loc-lac"]').onchange = e => {
+    });
+    onch('[data-nh="loc-lac"]', e => {
       const v = parseInt(e.target.value, 10);
       if (isNaN(v)) delete nh.location.lac; else nh.location.lac = v;
-    };
-    q('[data-nh="loc-cid"]').onchange = e => {
+    });
+    onch('[data-nh="loc-cid"]', e => {
       const v = parseInt(e.target.value, 10);
       if (isNaN(v)) delete nh.location.cid; else nh.location.cid = v;
-    };
-    q('[data-nh="imei"]').onchange = e => {
+    });
+    onch('[data-nh="imei"]', e => {
       nh.telephony.imei = e.target.value.trim();
       if (!nh.telephony.imei) delete nh.telephony.imei;
-    };
-    q('[data-nh="sim-op"]').onchange = e => {
+    });
+    onch('[data-nh="sim-op"]', e => {
       nh.telephony.sim_operator = e.target.value.trim();
       if (!nh.telephony.sim_operator) delete nh.telephony.sim_operator;
-    };
-    q('[data-nh="sim-name"]').onchange = e => {
+    });
+    onch('[data-nh="sim-name"]', e => {
       nh.telephony.sim_operator_name = e.target.value.trim();
       if (!nh.telephony.sim_operator_name) delete nh.telephony.sim_operator_name;
-    };
-    q('[data-nh="gpu-renderer"]').onchange = e => {
+    });
+    onch('[data-nh="gpu-renderer"]', e => {
       nh.gpu.renderer = e.target.value.trim();
       if (!nh.gpu.renderer) delete nh.gpu.renderer;
-    };
-    q('[data-nh="gpu-vendor"]').onchange = e => {
+    });
+    onch('[data-nh="gpu-vendor"]', e => {
       nh.gpu.vendor = e.target.value.trim();
       if (!nh.gpu.vendor) delete nh.gpu.vendor;
-    };
-    q('[data-nh="gpu-version"]').onchange = e => {
+    });
+    onch('[data-nh="gpu-version"]', e => {
       nh.gpu.version = e.target.value.trim();
       if (!nh.gpu.version) delete nh.gpu.version;
-    };
-    q('[data-nh="uptime"]').onchange = e => {
+    });
+    onch('[data-nh="uptime"]', e => {
       const v = parseInt(e.target.value, 10);
       if (isNaN(v) || v === 0) delete nh.uptime_offset_sec; else nh.uptime_offset_sec = v;
-    };
-    q('[data-nh="machine"]').onchange = e => {
+    });
+    onch('[data-nh="machine"]', e => {
       nh.uname.machine = e.target.value.trim();
       if (!nh.uname.machine) delete nh.uname.machine;
-    };
-    q('[data-nh="sysname"]').onchange = e => {
+    });
+    onch('[data-nh="sysname"]', e => {
       nh.uname.sysname = e.target.value.trim();
       if (!nh.uname.sysname) delete nh.uname.sysname;
-    };
+    });
     const propsBox = q('[data-props]');
     const renderProps = () => {
       propsBox.innerHTML = "";
@@ -303,7 +306,15 @@ document.getElementById("save").onclick = async () => {
       if (!nh) continue;
       if (nh.uname && !nh.uname.machine && !nh.uname.sysname) delete nh.uname;
       if (nh.props && Object.keys(nh.props).length === 0) delete nh.props;
-      if (!nh.uptime_offset_sec && !nh.uname && !nh.props) delete p.native_hooks;
+      if (nh.gpu && !nh.gpu.renderer && !nh.gpu.vendor && !nh.gpu.version) delete nh.gpu;
+      if (nh.telephony && !nh.telephony.imei && !nh.telephony.imsi && !nh.telephony.iccid && !nh.telephony.sim_operator && !nh.telephony.sim_operator_name) delete nh.telephony;
+      if (nh.id && !nh.id.android_id && !nh.id.mac_address && !nh.id.gaid) delete nh.id;
+      if (nh.drm && !nh.drm.security_level && !nh.drm.system_id && !nh.drm.vendor) delete nh.drm;
+      if (nh.location && nh.location.latitude === undefined && nh.location.longitude === undefined && !nh.location.lac && !nh.location.cid) delete nh.location;
+
+      const hasAny = nh.uptime_offset_sec || nh.uname || (nh.props && Object.keys(nh.props).length) ||
+                     nh.gpu || nh.telephony || nh.id || nh.drm || nh.location;
+      if (!hasAny) delete p.native_hooks;
     }
     // Atomic write: heredoc to tmp, then move into place.
     const body = JSON.stringify(cfg, null, 2);

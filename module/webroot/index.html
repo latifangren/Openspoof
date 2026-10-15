@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OpenSpoof</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; background: #0b0b12; color: #e8e8f0;
+         margin: 0; padding: 16px; max-width: 720px; margin-inline: auto; }
+  h1 { font-size: 1.25rem; margin: 0 0 4px; }
+  h2 { font-size: 1rem; margin: 20px 0 8px; color: #a5b4fc; }
+  .sub { color: #9a9ab0; font-size: .82rem; margin-bottom: 12px; }
+  .card { background: #14141d; border: 1px solid #26263a; border-radius: 12px;
+          padding: 12px; margin-bottom: 10px; }
+  .row { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+  .grow { flex: 1; min-width: 0; }
+  code { font-size: .82rem; word-break: break-all; }
+  input, select, button { font-size: .95rem; padding: 9px 10px; border-radius: 9px;
+    border: 1px solid #33334d; background: #1b1b28; color: inherit; }
+  input { width: 100%; }
+  button { background: #4f46e5; border: none; color: #fff; white-space: nowrap; }
+  button.danger { background: #7f1d1d; }
+  button:disabled { opacity: .5; }
+  .prof { font-size: .8rem; color: #9a9ab0; }
+  .prof b { color: #d4d4e8; }
+  #log { white-space: pre-wrap; font-size: .78rem; color: #9a9ab0; margin-top: 14px;
+         max-height: 160px; overflow-y: auto; }
+  .ok { color: #4ade80; } .err { color: #f87171; }
+</style>
+</head>
+<body>
+<h1>OpenSpoof <span id="ver" class="prof"></span></h1>
+<div class="sub">Per-app device &amp; CPU spoofing. Relaunch an app after saving to apply.</div>
+
+<h2>Assigned apps</h2>
+<div class="row">
+  <input id="filter" class="grow" placeholder="Filter packages…" />
+</div>
+<div id="apps"></div>
+
+<h2>Add app</h2>
+<div class="card">
+  <div class="row">
+    <input id="pkg" class="grow" list="pkgs" placeholder="package name (e.g. com.example.game)" />
+    <datalist id="pkgs"></datalist>
+    <select id="newProfile"></select>
+  </div>
+  <div class="row"><button id="add" class="grow">Add assignment</button></div>
+</div>
+
+<h2>Profiles</h2>
+<div id="profiles"></div>
+
+<div class="row" style="margin-top:16px">
+  <button id="save" class="grow">Save config.json</button>
+</div>
+<div id="log"></div>
+
+<script>
+const MOD = "/data/adb/modules/openspoof";
+const logEl = document.getElementById("log");
+const log = (m, cls) => {
+  const d = document.createElement("div");
+  if (cls) d.className = cls;
+  d.textContent = m;
+  logEl.prepend(d);
+};
+let cfg = { profiles: {}, apps: {} };
+
+async function exec(cmd) {
+  if (window.ksu && ksu.exec) return (await ksu.exec(cmd)).stdout;
+  throw new Error("no root bridge — open this page in KernelSU WebUI");
+}
+const esc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+
+async function load() {
+  try { document.getElementById("ver").textContent =
+    (await exec(`grep ^version= ${MOD}/module.prop`)).split("=")[1].trim(); }
+  catch (e) { /* non-fatal */ }
+  try {
+    cfg = JSON.parse(await exec(`cat ${MOD}/config.json`));
+    cfg.profiles ||= {}; cfg.apps ||= {};
+    log("config loaded", "ok");
+  } catch (e) { log("load failed: " + e.message + " — starting empty", "err"); }
+  try {
+    const out = await exec("pm list packages -3");
+    const dl = document.getElementById("pkgs");
+    dl.innerHTML = out.split("\n").filter(l => l.startsWith("package:"))
+      .map(l => `<option value="${l.slice(8).trim()}">`).join("");
+  } catch (e) { log("package list unavailable: " + e.message, "err"); }
+  render();
+}
+
+function render() {
+  const f = document.getElementById("filter").value.toLowerCase();
+  const profKeys = Object.keys(cfg.profiles);
+  document.getElementById("newProfile").innerHTML =
+    profKeys.map(k => `<option>${esc(k)}</option>`).join("");
+  const box = document.getElementById("apps");
+  const entries = Object.entries(cfg.apps).filter(([p]) => p.toLowerCase().includes(f));
+  box.innerHTML = entries.length ? "" : `<div class="sub">No apps assigned yet.</div>`;
+  for (const [pkg, key] of entries) {
+    const div = document.createElement("div");
+    div.className = "card";
+    div.innerHTML = `<div class="row"><code class="grow">${esc(pkg)}</code>
+      <select>${profKeys.map(k =>
+        `<option${k === key ? " selected" : ""}>${esc(k)}</option>`).join("")}</select>
+      <button class="danger">✕</button></div>`;
+    const [sel, btn] = [div.querySelector("select"), div.querySelector("button")];
+    sel.onchange = () => { cfg.apps[pkg] = sel.value; log(`${pkg} → ${sel.value}`); };
+    btn.onclick = () => { delete cfg.apps[pkg]; render(); };
+    box.appendChild(div);
+  }
+  const pb = document.getElementById("profiles");
+  pb.innerHTML = `<div class="sub" style="color:#fbbf24">⚠️ Native hooks are resident inline hooks — use at your own risk. Never enable for anti-cheat games.</div>`;
+  for (const [k, p] of Object.entries(cfg.profiles)) {
+    p.native_hooks ||= {};
+    const nh = p.native_hooks;
+    nh.uname ||= {}; nh.props ||= {}; nh.gpu ||= {};
+    const d = document.createElement("div");
+    d.className = "card";
+    d.innerHTML = `<div class="row"><b class="grow">${esc(k)}</b></div>
+      <div class="prof">MODEL <b>${esc(p.MODEL || "-")}</b> · BRAND <b>${esc(p.BRAND || "-")}</b><br>
+      FINGERPRINT <b>${esc((p.FINGERPRINT || "-").slice(0, 60))}…</b><br>
+      Android <b>${esc(p.RELEASE || "-")}</b> (SDK <b>${esc(String(p.SDK_INT ?? "-"))}</b>)</div>
+      <details><summary class="prof">Native hooks &amp; PRO Spoof (advanced)</summary>
+        <div class="prof" style="margin-top:8px; color:#38bdf8">🎮 GPU Spoofing (OpenGL / Vulkan)</div>
+        <div class="row"><span class="prof grow">GPU Renderer</span>
+          <input data-nh="gpu-renderer" value="${esc(nh.gpu?.renderer || "")}" placeholder="Adreno (TM) 750" style="width:180px"></div>
+        <div class="row"><span class="prof grow">GPU Vendor</span>
+          <input data-nh="gpu-vendor" value="${esc(nh.gpu?.vendor || "")}" placeholder="Qualcomm" style="width:180px"></div>
+        <div class="row"><span class="prof grow">GLES Version</span>
+          <input data-nh="gpu-version" value="${esc(nh.gpu?.version || "")}" placeholder="OpenGL ES 3.2 V@0750.0" style="width:180px"></div>
+        <div class="prof" style="margin-top:8px; color:#a78bfa">📱 Identity &amp; Telephony (PRO Tier)</div>
+        <div class="row"><span class="prof grow">Android ID</span>
+          <input data-nh="android-id" value="${esc(nh.id?.android_id || "")}" placeholder="16-hex digits" style="width:180px"></div>
+        <div class="row"><span class="prof grow">Hardware MAC</span>
+          <input data-nh="mac" value="${esc(nh.id?.mac_address || "")}" placeholder="02:42:AC:11:00:2A" style="width:180px"></div>
+        <div class="row"><span class="prof grow">IMEI</span>
+          <input data-nh="imei" value="${esc(nh.telephony?.imei || "")}" placeholder="15 digits" style="width:180px"></div>
+        <div class="row"><span class="prof grow">SIM Operator</span>
+          <input data-nh="sim-op" value="${esc(nh.telephony?.sim_operator || "")}" placeholder="310260" style="width:180px"></div>
+        <div class="row"><span class="prof grow">Operator Name</span>
+          <input data-nh="sim-name" value="${esc(nh.telephony?.sim_operator_name || "")}" placeholder="T-Mobile" style="width:180px"></div>
+        <div class="row"><span class="prof grow">Google Ad ID (GAID)</span>
+          <input data-nh="gaid" value="${esc(nh.id?.gaid || "")}" placeholder="a1b2c3d4-e5f6-..." style="width:180px"></div>
+        <div class="prof" style="margin-top:8px; color:#f43f5e">🎬 Widevine / DRM (PRO Tier)</div>
+        <div class="row"><span class="prof grow">Security Level</span>
+          <select data-nh="drm-sec" style="width:180px">
+            <option value=""${!nh.drm?.security_level ? " selected" : ""}>Default / None</option>
+            <option value="L1"${nh.drm?.security_level === "L1" ? " selected" : ""}>L1 (Hardware/HD)</option>
+            <option value="L3"${nh.drm?.security_level === "L3" ? " selected" : ""}>L3 (Software/SD)</option>
+          </select></div>
+        <div class="row"><span class="prof grow">DRM System ID</span>
+          <input data-nh="drm-sysid" value="${esc(nh.drm?.system_id || "")}" placeholder="4266" style="width:180px"></div>
+        <div class="row"><span class="prof grow">DRM Vendor</span>
+          <input data-nh="drm-vendor" value="${esc(nh.drm?.vendor || "")}" placeholder="Google" style="width:180px"></div>
+        <div class="prof" style="margin-top:8px; color:#10b981">📍 Geolocation &amp; Cell (PRO Tier)</div>
+        <div class="row"><span class="prof grow">Latitude</span>
+          <input data-nh="loc-lat" type="number" step="any" value="${nh.location?.latitude ?? ""}" placeholder="37.7749" style="width:180px"></div>
+        <div class="row"><span class="prof grow">Longitude</span>
+          <input data-nh="loc-lng" type="number" step="any" value="${nh.location?.longitude ?? ""}" placeholder="-122.4194" style="width:180px"></div>
+        <div class="row"><span class="prof grow">Cell LAC / CID</span>
+          <div class="row" style="margin:0; width:180px; gap:4px">
+            <input data-nh="loc-lac" type="number" value="${nh.location?.lac ?? ""}" placeholder="LAC" style="width:88px">
+            <input data-nh="loc-cid" type="number" value="${nh.location?.cid ?? ""}" placeholder="CID" style="width:88px">
+          </div>
+        </div>
+        <div class="prof" style="margin-top:8px">⚙️ System &amp; Uptime</div>
+        <div class="row"><span class="prof grow">Uptime offset (sec)</span>
+          <input data-nh="uptime" type="number" value="${nh.uptime_offset_sec ?? ""}" placeholder="e.g. 172800" style="width:180px"></div>
+        <div class="row"><span class="prof grow">uname machine</span>
+          <input data-nh="machine" value="${esc(nh.uname?.machine || "")}" placeholder="aarch64" style="width:180px"></div>
+        <div class="row"><span class="prof grow">uname sysname</span>
+          <input data-nh="sysname" value="${esc(nh.uname?.sysname || "")}" placeholder="Linux" style="width:180px"></div>
+        <div class="prof" style="margin-top:6px">Prop overrides</div>
+        <div data-props></div>
+        <div class="row"><button data-addprop>Add prop</button></div>
+      </details>`;
+    const q = s => d.querySelector(s);
+    const onch = (s, fn) => { const el = q(s); if (el) el.onchange = fn; };
+    nh.id ||= {}; nh.telephony ||= {}; nh.drm ||= {}; nh.location ||= {};
+    onch('[data-nh="android-id"]', e => {
+      nh.id.android_id = e.target.value.trim();
+      if (!nh.id.android_id) delete nh.id.android_id;
+    });
+    onch('[data-nh="mac"]', e => {
+      nh.id.mac_address = e.target.value.trim();
+      if (!nh.id.mac_address) delete nh.id.mac_address;
+    });
+    onch('[data-nh="gaid"]', e => {
+      nh.id.gaid = e.target.value.trim();
+      if (!nh.id.gaid) delete nh.id.gaid;
+    });
+    onch('[data-nh="drm-sec"]', e => {
+      nh.drm.security_level = e.target.value;
+      if (!nh.drm.security_level) delete nh.drm.security_level;
+    });
+    onch('[data-nh="drm-sysid"]', e => {
+      nh.drm.system_id = e.target.value.trim();
+      if (!nh.drm.system_id) delete nh.drm.system_id;
+    });
+    onch('[data-nh="drm-vendor"]', e => {
+      nh.drm.vendor = e.target.value.trim();
+      if (!nh.drm.vendor) delete nh.drm.vendor;
+    });
+    onch('[data-nh="loc-lat"]', e => {
+      const v = parseFloat(e.target.value);
+      if (isNaN(v)) delete nh.location.latitude; else nh.location.latitude = v;
+    });
+    onch('[data-nh="loc-lng"]', e => {
+      const v = parseFloat(e.target.value);
+      if (isNaN(v)) delete nh.location.longitude; else nh.location.longitude = v;
+    });
+    onch('[data-nh="loc-lac"]', e => {
+      const v = parseInt(e.target.value, 10);
+      if (isNaN(v)) delete nh.location.lac; else nh.location.lac = v;
+    });
+    onch('[data-nh="loc-cid"]', e => {
+      const v = parseInt(e.target.value, 10);
+      if (isNaN(v)) delete nh.location.cid; else nh.location.cid = v;
+    });
+    onch('[data-nh="imei"]', e => {
+      nh.telephony.imei = e.target.value.trim();
+      if (!nh.telephony.imei) delete nh.telephony.imei;
+    });
+    onch('[data-nh="sim-op"]', e => {
+      nh.telephony.sim_operator = e.target.value.trim();
+      if (!nh.telephony.sim_operator) delete nh.telephony.sim_operator;
+    });
+    onch('[data-nh="sim-name"]', e => {
+      nh.telephony.sim_operator_name = e.target.value.trim();
+      if (!nh.telephony.sim_operator_name) delete nh.telephony.sim_operator_name;
+    });
+    onch('[data-nh="gpu-renderer"]', e => {
+      nh.gpu.renderer = e.target.value.trim();
+      if (!nh.gpu.renderer) delete nh.gpu.renderer;
+    });
+    onch('[data-nh="gpu-vendor"]', e => {
+      nh.gpu.vendor = e.target.value.trim();
+      if (!nh.gpu.vendor) delete nh.gpu.vendor;
+    });
+    onch('[data-nh="gpu-version"]', e => {
+      nh.gpu.version = e.target.value.trim();
+      if (!nh.gpu.version) delete nh.gpu.version;
+    });
+    onch('[data-nh="uptime"]', e => {
+      const v = parseInt(e.target.value, 10);
+      if (isNaN(v) || v === 0) delete nh.uptime_offset_sec; else nh.uptime_offset_sec = v;
+    });
+    onch('[data-nh="machine"]', e => {
+      nh.uname.machine = e.target.value.trim();
+      if (!nh.uname.machine) delete nh.uname.machine;
+    });
+    onch('[data-nh="sysname"]', e => {
+      nh.uname.sysname = e.target.value.trim();
+      if (!nh.uname.sysname) delete nh.uname.sysname;
+    });
+    const propsBox = q('[data-props]');
+    const renderProps = () => {
+      propsBox.innerHTML = "";
+      for (const [pk, pv] of Object.entries(nh.props)) {
+        const r = document.createElement("div");
+        r.className = "row";
+        r.innerHTML = `<input class="grow" value="${esc(pk)}" data-pk placeholder="ro.product.model">` +
+          `<input class="grow" value="${esc(pv)}" data-pv placeholder="value"><button class="danger">✕</button>`;
+        const ki = r.querySelector("[data-pk]"), vi = r.querySelector("[data-pv]"),
+              btn = r.querySelector("button");
+        ki.onchange = () => {
+          const nv = vi.value;
+          delete nh.props[pk];
+          if (ki.value.trim()) nh.props[ki.value.trim()] = nv;
+          renderProps();
+        };
+        vi.onchange = () => { nh.props[pk] = vi.value; };
+        btn.onclick = () => { delete nh.props[pk]; renderProps(); };
+        propsBox.appendChild(r);
+      }
+    };
+    renderProps();
+    q('[data-addprop]').onclick = () => { nh.props["ro.product.model"] = ""; renderProps(); };
+    pb.appendChild(d);
+  }
+}
+
+document.getElementById("filter").oninput = render;
+document.getElementById("add").onclick = () => {
+  const pkg = document.getElementById("pkg").value.trim();
+  const key = document.getElementById("newProfile").value;
+  if (!pkg) return log("enter a package name", "err");
+  if (!key) return log("no profiles defined", "err");
+  cfg.apps[pkg] = key;
+  document.getElementById("pkg").value = "";
+  render();
+  log(`added ${pkg} → ${key}`, "ok");
+};
+document.getElementById("save").onclick = async () => {
+  const btn = document.getElementById("save");
+  btn.disabled = true;
+  try {
+    // Prune empty native_hooks so untouched profiles stay clean.
+    for (const p of Object.values(cfg.profiles)) {
+      const nh = p.native_hooks;
+      if (!nh) continue;
+      if (nh.uname && !nh.uname.machine && !nh.uname.sysname) delete nh.uname;
+      if (nh.props && Object.keys(nh.props).length === 0) delete nh.props;
+      if (nh.gpu && !nh.gpu.renderer && !nh.gpu.vendor && !nh.gpu.version) delete nh.gpu;
+      if (nh.telephony && !nh.telephony.imei && !nh.telephony.imsi && !nh.telephony.iccid && !nh.telephony.sim_operator && !nh.telephony.sim_operator_name) delete nh.telephony;
+      if (nh.id && !nh.id.android_id && !nh.id.mac_address && !nh.id.gaid) delete nh.id;
+      if (nh.drm && !nh.drm.security_level && !nh.drm.system_id && !nh.drm.vendor) delete nh.drm;
+      if (nh.location && nh.location.latitude === undefined && nh.location.longitude === undefined && !nh.location.lac && !nh.location.cid) delete nh.location;
+
+      const hasAny = nh.uptime_offset_sec || nh.uname || (nh.props && Object.keys(nh.props).length) ||
+                     nh.gpu || nh.telephony || nh.id || nh.drm || nh.location;
+      if (!hasAny) delete p.native_hooks;
+    }
+    // Atomic write: heredoc to tmp, then move into place.
+    const body = JSON.stringify(cfg, null, 2);
+    const b64 = btoa(unescape(encodeURIComponent(body)));
+    await exec(`echo '${b64}' | base64 -d > ${MOD}/config.json.tmp && ` +
+               `mv ${MOD}/config.json.tmp ${MOD}/config.json && chmod 0644 ${MOD}/config.json`);
+    log("saved. Relaunch assigned apps to apply.", "ok");
+  } catch (e) { log("save failed: " + e.message, "err"); }
+  btn.disabled = false;
+};
+load();
+</script>
+</body>
+</html>

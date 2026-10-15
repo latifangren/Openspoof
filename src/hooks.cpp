@@ -79,6 +79,7 @@ static int (*orig_system_property_get)(const char*, char*) = nullptr;
 static std::map<std::string, std::string> g_props;
 
 int fake_system_property_get(const char* name, char* value) {
+    if (name == nullptr || value == nullptr) return 0;
     auto it = g_props.find(name);
     if (it != g_props.end()) {
         size_t n = it->second.size();
@@ -87,7 +88,10 @@ int fake_system_property_get(const char* name, char* value) {
         value[n] = '\0';
         return (int)n;
     }
-    return orig_system_property_get(name, value);
+    if (orig_system_property_get != nullptr) {
+        return orig_system_property_get(name, value);
+    }
+    return 0;
 }
 
 // --- Phase B: MAC address spoofing via ioctl(SIOCGIFHWADDR) -------------------

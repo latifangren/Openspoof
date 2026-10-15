@@ -1,0 +1,98 @@
+{
+  "apps": {
+    "com.tencent.tmgp.sgame": "redmagic_9_pro"
+  },
+  "profiles": {
+    "redmagic_9_pro": {
+      "BOARD": "pineapple",
+      "BRAND": "nubia",
+      "DEVICE": "NX769J",
+      "DISPLAY": "NX769J_UNCommon_9.0.13",
+      "FINGERPRINT": "nubia/NX769J/NX769J:14/UKQ1.230917.001/20240813.173312:user/release-keys",
+      "HARDWARE": "qcom",
+      "ID": "UKQ1.230917.001",
+      "INCREMENTAL": "20240813.173312",
+      "MANUFACTURER": "ZTE",
+      "MODEL": "NX769J",
+      "PRODUCT": "NX769J",
+      "RELEASE": "14",
+      "SDK_INT": 34,
+      "SECURITY_PATCH": "2024-08-01",
+      "native_hooks": {
+        "gpu": {
+          "vendor": "Qualcomm",
+          "renderer": "Adreno (TM) 750",
+          "version": "OpenGL ES 3.2 V@0750.0",
+          "egl_vendor": "Qualcomm",
+          "egl_version": "1.5"
+        },
+        "telephony": {
+          "imei": "860472048194721",
+          "imsi": "310260123456789",
+          "iccid": "89012607823901234567",
+          "sim_operator": "310260",
+          "sim_operator_name": "T-Mobile",
+          "sim_country_iso": "us"
+        },
+        "id": {
+          "android_id": "7b39a48f10c2e5d9",
+          "mac_address": "02:42:AC:11:00:2A",
+          "gaid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "drm": {
+          "security_level": "L1",
+          "vendor": "Google",
+          "version": "16.0.0",
+          "system_id": "4266"
+        },
+        "location": {
+          "latitude": "37.7749",
+          "longitude": "-122.4194",
+          "altitude": "15.0",
+          "accuracy": "5.0",
+          "lac": "12345",
+          "cid": "67890"
+        },
+        "props": {
+          "ro.product.brand": "nubia",
+          "ro.product.model": "NX769J"
+        },
+        "uname": {
+          "machine": "aarch64",
+          "sysname": "Linux"
+        },
+        "uptime_offset_sec": 172800
+      }
+    },
+    "pixel_9_pro": {
+      "BOARD": "caiman",
+      "BRAND": "google",
+      "DEVICE": "caiman",
+      "DISPLAY": "CP3A.260905.009",
+      "FINGERPRINT": "google/caiman/caiman:17/CP3A.260905.009/16091614:user/release-keys",
+      "HARDWARE": "caiman",
+      "ID": "CP3A.260905.009",
+      "INCREMENTAL": "16091614",
+      "MANUFACTURER": "Google",
+      "MODEL": "Pixel 9 Pro",
+      "PRODUCT": "caiman",
+      "RELEASE": "17",
+      "SDK_INT": 35,
+      "SECURITY_PATCH": "2025-01-05",
+      "native_hooks": {
+        "gpu": {
+          "vendor": "ARM",
+          "renderer": "Mali-G715 Immortalis-G715 MC10",
+          "version": "OpenGL ES 3.2 v1.r38p0-01eac0"
+        },
+        "props": {
+          "ro.product.brand": "google",
+          "ro.product.model": "Pixel 9 Pro"
+        },
+        "uname": {
+          "machine": "aarch64"
+        }
+      }
+    }
+  }
+}

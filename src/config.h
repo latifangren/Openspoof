@@ -164,9 +164,25 @@ private:
     bool parseNumber(std::string& out) {
         skipWs();
         size_t start = pos_;
-        if (pos_ < s_.size() && s_[pos_] == '-') pos_++;
-        while (pos_ < s_.size() && std::isdigit((unsigned char)s_[pos_])) pos_++;
-        if (pos_ == start) return false;
+        if (pos_ < s_.size() && (s_[pos_] == '-' || s_[pos_] == '+')) pos_++;
+        bool hasDigits = false;
+        while (pos_ < s_.size() && std::isdigit((unsigned char)s_[pos_])) {
+            pos_++;
+            hasDigits = true;
+        }
+        if (pos_ < s_.size() && s_[pos_] == '.') {
+            pos_++;
+            while (pos_ < s_.size() && std::isdigit((unsigned char)s_[pos_])) {
+                pos_++;
+                hasDigits = true;
+            }
+        }
+        if (hasDigits && pos_ < s_.size() && (s_[pos_] == 'e' || s_[pos_] == 'E')) {
+            pos_++;
+            if (pos_ < s_.size() && (s_[pos_] == '-' || s_[pos_] == '+')) pos_++;
+            while (pos_ < s_.size() && std::isdigit((unsigned char)s_[pos_])) pos_++;
+        }
+        if (!hasDigits) return false;
         out = s_.substr(start, pos_ - start);
         return true;
     }

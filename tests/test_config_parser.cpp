@@ -280,6 +280,47 @@ static void testCombinedProfile() {
     EXPECT(cfg.apps["com.example.game"] == "demo", "app->profile map");
 }
 
+static void testGlobalWildcardAppMatching() {
+    const char* json = R"({
+      "apps": {
+        "*": "global_profile",
+        "com.banking.app": "none",
+        "com.custom.game": "game_profile"
+      },
+      "profiles": {
+        "global_profile": { "BRAND": "Google" },
+        "game_profile": { "BRAND": "ASUS" }
+      }
+    })";
+    Config cfg = loadFromString(json);
+    EXPECT(cfg.apps["*"] == "global_profile", "wildcard app in config");
+    EXPECT(cfg.apps["com.banking.app"] == "none", "excluded app in config");
+    EXPECT(cfg.apps["com.custom.game"] == "game_profile", "custom game in config");
+
+    // Emulate resolution logic from spoof.cpp
+    auto resolveApp = [&cfg](const std::string& process) -> std::string {
+        auto it = cfg.apps.find(process);
+        if (it == cfg.apps.end()) {
+            it = cfg.apps.find("*");
+            if (it != cfg.apps.end()) {
+                if (process == "system_server" || process == "com.android.systemui") {
+                    return "";
+                }
+            }
+        }
+        if (it == cfg.apps.end() || it->second.empty() || it->second == "none") {
+            return "";
+        }
+        return it->second;
+    };
+
+    EXPECT(resolveApp("com.custom.game") == "game_profile", "direct app resolve");
+    EXPECT(resolveApp("com.any.random.app") == "global_profile", "wildcard fallback resolve");
+    EXPECT(resolveApp("com.banking.app") == "", "excluded app resolve to empty");
+    EXPECT(resolveApp("system_server") == "", "system_server blacklist resolve to empty");
+    EXPECT(resolveApp("com.android.systemui") == "", "systemui blacklist resolve to empty");
+}
+
 int main() {
     testRefreshRate();
     testRefreshRateRangeClamp();
@@ -292,6 +333,7 @@ int main() {
     testVersionPolicyUnknownFallsBackToRom();
     testExtendedBuildFields();
     testCombinedProfile();
+    testGlobalWildcardAppMatching();
     std::printf("---\nTotal: %d  Pass: %d  Fail: %d\n",
                 g_pass + g_fail, g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

@@ -1,93 +1,490 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>OpenSpoof</title>
-<style>
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
-  body { font-family: system-ui, sans-serif; background: #0b0b12; color: #e8e8f0;
-         margin: 0; padding: 16px; max-width: 720px; margin-inline: auto; }
-  h1 { font-size: 1.25rem; margin: 0 0 4px; }
-  h2 { font-size: 1rem; margin: 20px 0 8px; color: #a5b4fc; }
-  .sub { color: #9a9ab0; font-size: .82rem; margin-bottom: 12px; }
-  .card { background: #14141d; border: 1px solid #26263a; border-radius: 12px;
-          padding: 12px; margin-bottom: 10px; }
-  .row { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
-  .grow { flex: 1; min-width: 0; }
-  code { font-size: .82rem; word-break: break-all; }
-  input, select, button { font-size: .95rem; padding: 9px 10px; border-radius: 9px;
-    border: 1px solid #33334d; background: #1b1b28; color: inherit; }
-  input { width: 100%; }
-  button { background: #4f46e5; border: none; color: #fff; white-space: nowrap; cursor: pointer; }
-  button.danger { background: #7f1d1d; }
-  button.sec { background: #27273a; border: 1px solid #3b3b55; }
-  button:disabled { opacity: .5; cursor: not-allowed; }
-  .prof { font-size: .8rem; color: #9a9ab0; }
-  .prof b { color: #d4d4e8; }
-  #log { white-space: pre-wrap; font-size: .78rem; color: #9a9ab0; margin-top: 14px;
-         max-height: 160px; overflow-y: auto; }
-  .ok { color: #4ade80; } .err { color: #f87171; }
-  details { margin-top: 8px; }
-  summary { cursor: pointer; user-select: none; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0c0d14">
+  <title>OpenSpoof Control Center</title>
+  <style>
+    :root {
+      --bg: #0c0d14;
+      --card-bg: #151724;
+      --card-hover: #1b1e2e;
+      --card-sec: #1e2235;
+      --border: #282d44;
+      --border-focus: #6366f1;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --accent-dim: rgba(99, 102, 241, 0.15);
+      --success: #10b981;
+      --success-dim: rgba(16, 185, 129, 0.15);
+      --danger: #ef4444;
+      --danger-dim: rgba(239, 68, 68, 0.15);
+      --warning: #f59e0b;
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding-bottom: 60px; line-height: 1.5; font-size: 14px; }
+    
+    /* Top Bar */
+    header {
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(10px);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-logo {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: linear-gradient(135deg, #6366f1, #a855f7);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 16px; color: #fff;
+    }
+    .brand-title { font-size: 16px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px; }
+    .badge {
+      font-size: 11px; padding: 2px 7px; border-radius: 12px; font-weight: 600;
+      background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(99,102,241,0.3);
+    }
+    .badge-success { background: var(--success-dim); color: var(--success); border-color: rgba(16,185,129,0.3); }
+    .badge-warning { background: rgba(245,158,11,0.15); color: var(--warning); border-color: rgba(245,158,11,0.3); }
+    
+    .actions { display: flex; gap: 8px; }
+    button {
+      font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: var(--radius-sm);
+      border: 1px solid var(--border); background: var(--card-sec); color: var(--text);
+      cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 6px;
+    }
+    button:active { transform: scale(0.97); }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    button.primary:hover { background: var(--accent-hover); }
+    button.danger { background: var(--danger-dim); border-color: rgba(239,68,68,0.4); color: var(--danger); }
+    button.sm { padding: 5px 10px; font-size: 12px; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Navigation Tabs */
+    .tabs-nav {
+      display: flex; background: var(--card-bg); border-bottom: 1px solid var(--border);
+      padding: 6px 16px; gap: 8px; overflow-x: auto;
+    }
+    .tab-btn {
+      padding: 8px 16px; border-radius: 20px; border: 1px solid transparent;
+      background: transparent; color: var(--muted); font-size: 13px; font-weight: 600;
+      cursor: pointer; white-space: nowrap; transition: all 0.2s;
+    }
+    .tab-btn.active {
+      background: var(--accent); color: #fff;
+    }
+
+    /* Container & Cards */
+    .container { max-width: 900px; margin: 0 auto; padding: 16px; }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+    .card {
+      background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 16px; margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 15px; font-weight: 700; margin-bottom: 12px; display: flex;
+      align-items: center; justify-content: space-between; color: #fff;
+    }
+    .card-desc { font-size: 12px; color: var(--muted); margin-top: -6px; margin-bottom: 12px; }
+
+    /* Form inputs */
+    .form-group { margin-bottom: 12px; }
+    label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+    input[type="text"], input[type="number"], select, textarea {
+      width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+      background: var(--bg); color: var(--text); font-size: 13px; outline: none; transition: border-color 0.2s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--border-focus); }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+
+    /* Global Banner */
+    .global-card {
+      background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(168,85,247,0.08));
+      border: 1px solid rgba(99,102,241,0.3); border-radius: var(--radius);
+      padding: 16px; margin-bottom: 16px;
+    }
+    .global-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .toggle-switch {
+      position: relative; display: inline-block; width: 48px; height: 26px; flex-shrink: 0;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #334155; transition: .3s; border-radius: 26px;
+    }
+    .slider:before {
+      position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px;
+      background-color: white; transition: .3s; border-radius: 50%;
+    }
+    input:checked + .slider { background-color: var(--accent); }
+    input:checked + .slider:before { transform: translateX(22px); }
+
+    /* Tables & Lists */
+    .app-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    .app-table th, .app-table td {
+      padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13px;
+    }
+    .app-table th { color: var(--muted); font-size: 12px; font-weight: 600; }
+    .app-table tr:hover td { background: var(--card-hover); }
+    .pkg-mono { font-family: ui-monospace, monospace; font-size: 12px; color: #a5b4fc; }
+
+    /* Modal / Drawer */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75);
+      z-index: 100; display: none; align-items: center; justify-content: center; padding: 16px;
+      backdrop-filter: blur(4px);
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius);
+      width: 100%; max-width: 580px; max-height: 85vh; display: flex; flex-direction: column;
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);
+    }
+    .modal-header {
+      padding: 16px; border-bottom: 1px solid var(--border); display: flex;
+      justify-content: space-between; align-items: center;
+    }
+    .modal-body { padding: 16px; overflow-y: auto; flex: 1; }
+    .modal-footer { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+
+    /* App list item in modal */
+    .app-item {
+      display: flex; align-items: center; justify-content: space-between; padding: 10px;
+      border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 8px;
+      background: var(--bg); gap: 10px;
+    }
+    .app-item:hover { border-color: var(--accent); }
+    .app-info { flex: 1; min-width: 0; }
+    .app-pkg { font-family: ui-monospace, monospace; font-size: 12px; color: #fff; word-break: break-all; }
+    .app-status { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: 20px; right: 20px; padding: 10px 16px; border-radius: var(--radius-sm);
+      font-size: 13px; font-weight: 600; color: #fff; z-index: 200; transform: translateY(100px);
+      opacity: 0; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); pointer-events: none;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+    #toast.ok { background: #059669; border: 1px solid #10b981; }
+    #toast.err { background: #dc2626; border: 1px solid #ef4444; }
+
+    /* Terminal / Log viewer */
+    .log-box {
+      background: #06070a; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 12px; font-family: ui-monospace, monospace; font-size: 11px; color: #94a3b8;
+      height: 350px; overflow-y: auto; white-space: pre-wrap; line-height: 1.4;
+    }
+  </style>
 </head>
 <body>
-<h1>OpenSpoof <span id="ver" class="prof"></span></h1>
-<div class="sub">Per-app device &amp; hardware spoofing engine. Relaunch an app after saving to apply.</div>
 
-<h2>Assigned apps</h2>
-<div class="row">
-  <input id="filter" class="grow" placeholder="Filter packages…" />
-</div>
-<div id="apps"></div>
+  <header>
+    <div class="brand">
+      <div class="brand-logo">OS</div>
+      <div>
+        <div class="brand-title">
+          OpenSpoof
+          <span class="badge" id="modVer">v0.2.0</span>
+          <span class="badge badge-success" id="zygiskStatus">Zygisk Active</span>
+        </div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="saveBtn">💾 Simpan & Terapkan</button>
+    </div>
+  </header>
 
-<h2>Add app</h2>
-<div class="card">
-  <div class="row">
-    <input id="pkg" class="grow" list="pkgs" placeholder="package name (e.g. com.tencent.ig)" />
-    <datalist id="pkgs"></datalist>
-    <select id="newProfile"></select>
+  <nav class="tabs-nav">
+    <button class="tab-btn active" data-tab="tab-apps">📱 Target Apps & Global</button>
+    <button class="tab-btn" data-tab="tab-profiles">⚙️ Device Profiles</button>
+    <button class="tab-btn" data-tab="tab-diag">🩺 Diagnostik & Log</button>
+  </nav>
+
+  <div class="container">
+
+    <!-- TAB 1: APPS & SCOPE -->
+    <div id="tab-apps" class="tab-pane active">
+
+      <!-- Global Mode Card -->
+      <div class="global-card">
+        <div class="global-header">
+          <div>
+            <div style="font-size: 15px; font-weight: 700; color: #fff;">🌐 Mode Global System (*)</div>
+            <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">
+              Spoof semua aplikasi sekaligus secara default. Proses inti sistem (System UI, phone, Google Services) otomatis terlindungi.
+            </div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="globalToggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div id="globalSettings" style="margin-top: 14px; display: none;">
+          <label>Pilih Profil Default untuk Seluruh Aplikasi:</label>
+          <div style="display: flex; gap: 8px;">
+            <select id="globalProfileSelect" style="flex: 1;"></select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Per-App Overrides Card -->
+      <div class="card">
+        <div class="card-title">
+          <span>🎯 Daftar Target Aplikasi Khusus</span>
+          <button class="primary sm" id="openPickerBtn">📱 Pilih App dari HP</button>
+        </div>
+        <div class="card-desc">Atur profil spesifik per-aplikasi atau kecualikan aplikasi tertentu dari mode global.</div>
+
+        <!-- Add Manual App Row -->
+        <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+          <input type="text" id="manualPkg" placeholder="Nama package (misal com.dts.freefireth)..." style="flex: 2;">
+          <select id="manualProf" style="flex: 1;"></select>
+          <button class="primary sm" id="addManualAppBtn">+ Tambah</button>
+        </div>
+
+        <!-- Filter input -->
+        <input type="text" id="appFilter" placeholder="🔍 Cari aplikasi terdaftar..." style="margin-bottom: 10px;">
+
+        <!-- Apps Table -->
+        <div style="overflow-x: auto;">
+          <table class="app-table">
+            <thead>
+              <tr>
+                <th>Package Name</th>
+                <th>Profil Target</th>
+                <th style="width: 70px; text-align: center;">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="appTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TAB 2: PROFILES -->
+    <div id="tab-profiles" class="tab-pane">
+
+      <div class="card">
+        <div class="card-title">
+          <span>Kelola Profil Perangkat</span>
+          <div style="display: flex; gap: 8px;">
+            <button class="danger sm" id="deleteProfBtn">🗑 Hapus Profil</button>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-bottom: 14px;">
+          <div>
+            <label>Pilih Profil yang Sedang Diedit:</label>
+            <select id="activeProfSelect"></select>
+          </div>
+          <div>
+            <label>⚡ Terapkan Preset Perangkat Populer:</label>
+            <select id="presetPicker">
+              <option value="">-- Pilih Preset Cepat --</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Create New Profile -->
+        <div style="display: flex; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border);">
+          <input type="text" id="newProfName" placeholder="Nama profil baru (misal: my_custom_rog)..." style="flex: 2;">
+          <button class="sm" id="createProfBtn">+ Buat Profil</button>
+        </div>
+      </div>
+
+      <!-- Profile Editor Fields -->
+      <div id="profileFieldsContainer">
+        <!-- Build Identity -->
+        <div class="card">
+          <div class="card-title">Identitas Dasar (android.os.Build)</div>
+          <div class="grid-3">
+            <div class="form-group"><label>BRAND</label><input type="text" data-field="BRAND"></div>
+            <div class="form-group"><label>MANUFACTURER</label><input type="text" data-field="MANUFACTURER"></div>
+            <div class="form-group"><label>MODEL</label><input type="text" data-field="MODEL"></div>
+            <div class="form-group"><label>DEVICE</label><input type="text" data-field="DEVICE"></div>
+            <div class="form-group"><label>PRODUCT</label><input type="text" data-field="PRODUCT"></div>
+            <div class="form-group"><label>BOARD</label><input type="text" data-field="BOARD"></div>
+            <div class="form-group"><label>HARDWARE</label><input type="text" data-field="HARDWARE"></div>
+            <div class="form-group"><label>SDK_INT</label><input type="number" data-field="SDK_INT"></div>
+            <div class="form-group"><label>RELEASE (Android Version)</label><input type="text" data-field="RELEASE"></div>
+            <div class="form-group"><label>ID</label><input type="text" data-field="ID"></div>
+            <div class="form-group"><label>DISPLAY</label><input type="text" data-field="DISPLAY"></div>
+            <div class="form-group"><label>BOOTLOADER</label><input type="text" data-field="BOOTLOADER"></div>
+          </div>
+          <div class="form-group" style="margin-top: 8px;">
+            <label>FINGERPRINT</label>
+            <input type="text" data-field="FINGERPRINT">
+          </div>
+        </div>
+
+        <!-- Display & GPU Spoofing -->
+        <div class="card">
+          <div class="card-title">Grafis & Layar (GPU & Display Hooks)</div>
+          <div class="grid-2">
+            <div class="form-group">
+              <label>Refresh Rate Layar (Hz)</label>
+              <select id="nh_refresh_rate">
+                <option value="0">Default (Tidak Dispoof)</option>
+                <option value="60">60 Hz</option>
+                <option value="90">90 Hz</option>
+                <option value="120">120 Hz (Gaming Standard)</option>
+                <option value="144">144 Hz (Ultra Smooth)</option>
+                <option value="165">165 Hz (ROG / RedMagic)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Bypass FLAG_SECURE</label>
+              <select id="nh_flag_secure">
+                <option value="false">Nonaktif (Normal)</option>
+                <option value="true">Aktif (Izinkan Screenshot / Screen Record)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>GPU Vendor</label>
+              <input type="text" id="nh_gpu_vendor" placeholder="misal: Qualcomm atau ARM">
+            </div>
+            <div class="form-group">
+              <label>GPU Renderer</label>
+              <input type="text" id="nh_gpu_renderer" placeholder="misal: Adreno (TM) 750 atau Adreno (TM) 830">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>OpenGL Version</label>
+            <input type="text" id="nh_gpu_version" placeholder="misal: OpenGL ES 3.2 V@0750.0 (GIT@...)">
+          </div>
+        </div>
+
+        <!-- CPU Presets -->
+        <div class="card">
+          <div class="card-title">CPU Info (/proc/cpuinfo Bind-Mount)</div>
+          <div class="card-desc">Mengganti informasi SoC kernel (/proc/cpuinfo) tanpa menyentuh file sistem nyata.</div>
+          <div class="form-group">
+            <label>Terapkan Preset SoC / CPU:</label>
+            <select id="cpuPresetPicker">
+              <option value="">-- Pilih SoC CPU --</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Security & Hardware Identifiers -->
+        <div class="card">
+          <div class="card-title">Identitas Perangkat Keras (PRO Features)</div>
+          <div class="grid-2">
+            <div class="form-group">
+              <label>Android ID (16 Hex Karakter)</label>
+              <div style="display: flex; gap: 6px;">
+                <input type="text" id="nh_android_id" placeholder="misal: a1b2c3d4e5f60718">
+                <button class="sm" id="randomizeAndroidIdBtn">🎲 Acak</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Bahasa / Locale Override</label>
+              <input type="text" id="nh_language" placeholder="misal: en-US, ja-JP, zh-CN">
+            </div>
+            <div class="form-group">
+              <label>Fake Uptime (Offset Detik)</label>
+              <input type="number" id="nh_uptime" placeholder="0 = Real uptime">
+            </div>
+            <div class="form-group">
+              <label>Fake Uname (Machine Architecture)</label>
+              <input type="text" id="nh_uname_machine" placeholder="misal: aarch64">
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- TAB 3: DIAGNOSTICS & LOGS -->
+    <div id="tab-diag" class="tab-pane">
+      <div class="card">
+        <div class="card-title">🩺 Status Sistem & Modul</div>
+        <div class="grid-2">
+          <div>
+            <div style="font-size: 12px; color: var(--muted);">Status Zygisk Module:</div>
+            <div style="font-weight: 700; color: var(--success); font-size: 14px;" id="diagZygisk">Siap / Terpasang</div>
+          </div>
+          <div>
+            <div style="font-size: 12px; color: var(--muted);">File Konfigurasi:</div>
+            <div style="font-weight: 700; color: #fff; font-size: 14px;" id="diagConfigStatus">/data/adb/modules/openspoof/config.json</div>
+          </div>
+          <div>
+            <div style="font-size: 12px; color: var(--muted);">Jumlah Profil Terdaftar:</div>
+            <div style="font-weight: 700; color: #fff; font-size: 14px;" id="diagProfCount">0</div>
+          </div>
+          <div>
+            <div style="font-size: 12px; color: var(--muted);">Status Mode Global:</div>
+            <div style="font-weight: 700; color: #a5b4fc; font-size: 14px;" id="diagGlobalStatus">Nonaktif</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Logcat Box -->
+      <div class="card">
+        <div class="card-title">
+          <span>📜 Real-time Module Logcat</span>
+          <div style="display: flex; gap: 8px;">
+            <button class="sm" id="refreshLogBtn">🔄 Refresh Log</button>
+            <button class="sm" id="clearLogBtn">🧹 Bersihkan</button>
+          </div>
+        </div>
+        <div class="card-desc">Memantau proses spesialisasi Zygisk dan Dobby hooks saat aplikasi diluncurkan.</div>
+        <div class="log-box" id="logBox">Menunggu pembacaan logcat...</div>
+      </div>
+    </div>
+
   </div>
-  <div class="row"><button id="add" class="grow">Add assignment</button></div>
-</div>
 
-<h2>Profiles</h2>
-<div class="card" style="border-color:#3b3b55">
-  <div class="row">
-    <input id="newProfName" class="grow" placeholder="New profile name (e.g. s24_ultra)..." />
-    <select id="newProfPreset" style="max-width:200px">
-      <option value="">⚡ Custom (Blank)</option>
-      <option value="redmagic_9_pro">RedMagic 9 Pro</option>
-      <option value="rog_phone_8_pro">ROG Phone 8 Pro</option>
-      <option value="galaxy_s24_ultra">Galaxy S24 Ultra</option>
-      <option value="pixel_9_pro">Pixel 9 Pro</option>
-      <option value="pixel_8_pro">Pixel 8 Pro</option>
-    </select>
-    <button id="addProfBtn">+ Add Profile</button>
+  <!-- APP PICKER MODAL -->
+  <div class="modal-overlay" id="pickerModal">
+    <div class="modal">
+      <div class="modal-header">
+        <div style="font-size: 15px; font-weight: 700; color: #fff;">📱 Pilih Aplikasi Terpasang</div>
+        <button class="sm" id="closePickerBtn" style="padding: 4px 8px;">✕</button>
+      </div>
+      <div style="padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; gap: 8px;">
+        <input type="text" id="pickerSearch" placeholder="🔍 Cari nama package..." style="flex: 1;">
+        <select id="pickerTypeSelect" style="width: 140px;">
+          <option value="3rd">Aplikasi User</option>
+          <option value="system">App Sistem</option>
+          <option value="all">Semua App</option>
+        </select>
+      </div>
+      <div class="modal-body" id="pickerList">
+        <div style="text-align: center; color: var(--muted); padding: 20px;">Memuat aplikasi dari HP...</div>
+      </div>
+      <div class="modal-footer">
+        <button class="sm" id="donePickerBtn">Selesai</button>
+      </div>
+    </div>
   </div>
-</div>
 
-<div id="profiles"></div>
+  <div id="toast"></div>
 
-<div class="row" style="margin-top:16px">
-  <button id="save" class="grow">Save config.json</button>
-</div>
-<div id="log"></div>
+  <script>
+    const MOD = "/data/adb/modules/openspoof";
+    let cfg = { version_policy: "Rom", profiles: {}, apps: {} };
+    let installedApps = [];
+    let currentTab = "tab-apps";
+    let activeProfileKey = "";
 
-<script>
-const MOD = "/data/adb/modules/openspoof";
-const logEl = document.getElementById("log");
-const log = (m, cls) => {
-  const d = document.createElement("div");
-  if (cls) d.className = cls;
-  d.textContent = m;
-  logEl.prepend(d);
-};
-let cfg = { profiles: {}, apps: {} };
-
-const DEVICE_PRESETS = {
+    const DEVICE_PRESETS = {
   redmagic_9_pro: {
     label: "RedMagic 9 Pro (Snapdragon 8 Gen 3)",
     MANUFACTURER: "ZTE", MODEL: "NX769J", BRAND: "nubia", DEVICE: "NX769J", PRODUCT: "NX769J",
@@ -95,6 +492,14 @@ const DEVICE_PRESETS = {
     FINGERPRINT: "nubia/NX769J/NX769J:14/UKQ1.230917.001/20240813.173312:user/release-keys",
     SDK_INT: 34, RELEASE: "14",
     gpu: { vendor: "Qualcomm", renderer: "Adreno (TM) 750", version: "OpenGL ES 3.2 V@0750.0" }
+  },
+  redmagic_10_pro: {
+    label: "RedMagic 10 Pro (Snapdragon 8 Elite)",
+    MANUFACTURER: "ZTE", MODEL: "NX789J", BRAND: "nubia", DEVICE: "NX789J", PRODUCT: "NX789J",
+    BOARD: "pineapple", HARDWARE: "qcom",
+    FINGERPRINT: "nubia/NX789J/NX789J:15/AP3A.241105.008/20241121.000000:user/release-keys",
+    SDK_INT: 35, RELEASE: "15",
+    gpu: { vendor: "Qualcomm", renderer: "Adreno (TM) 830", version: "OpenGL ES 3.2 V@0830.0" }
   },
   rog_phone_8_pro: {
     label: "ROG Phone 8 Pro (Snapdragon 8 Gen 3)",
@@ -104,6 +509,38 @@ const DEVICE_PRESETS = {
     SDK_INT: 34, RELEASE: "14",
     gpu: { vendor: "Qualcomm", renderer: "Adreno (TM) 750", version: "OpenGL ES 3.2 V@0750.0" }
   },
+  oneplus_12: {
+    label: "OnePlus 12 (Snapdragon 8 Gen 3)",
+    MANUFACTURER: "OnePlus", MODEL: "CPH2583", BRAND: "OnePlus", DEVICE: "CPH2583", PRODUCT: "CPH2583",
+    BOARD: "pineapple", HARDWARE: "qcom",
+    FINGERPRINT: "OnePlus/CPH2583/CPH2583:14/UP1A.240109.001/S.aa8c8d5-1-3:user/release-keys",
+    SDK_INT: 34, RELEASE: "14",
+    gpu: { vendor: "Qualcomm", renderer: "Adreno (TM) 750", version: "OpenGL ES 3.2 V@0750.0" }
+  },
+  xiaomi_14_pro: {
+    label: "Xiaomi 14 Pro (Snapdragon 8 Gen 3)",
+    MANUFACTURER: "Xiaomi", MODEL: "2401112C", BRAND: "Xiaomi", DEVICE: "2401112C", PRODUCT: "2401112C",
+    BOARD: "pineapple", HARDWARE: "qcom",
+    FINGERPRINT: "Xiaomi/shennong_eea/shennong:14/UKQ1.240116.001/16.0.3.0.TNBEUXM:user/release-keys",
+    SDK_INT: 34, RELEASE: "14",
+    gpu: { vendor: "Qualcomm", renderer: "Adreno (TM) 750", version: "OpenGL ES 3.2 V@0750.0" }
+  },
+  iqoo_12_pro: {
+    label: "iQOO 12 Pro (Snapdragon 8 Gen 3)",
+    MANUFACTURER: "vivo", MODEL: "V2329A", BRAND: "vivo", DEVICE: "V2329A", PRODUCT: "V2329A",
+    BOARD: "pineapple", HARDWARE: "qcom",
+    FINGERPRINT: "vivo/V2329A/V2329A:14/UP1A.240109.001/V_OS_14.0.10.5.W30.V000L1:user/release-keys",
+    SDK_INT: 34, RELEASE: "14",
+    gpu: { vendor: "Qualcomm", renderer: "Adreno (TM) 750", version: "OpenGL ES 3.2 V@0750.0" }
+  },
+  honor_magic7_pro: {
+    label: "Honor Magic7 Pro (Snapdragon 8 Elite)",
+    MANUFACTURER: "Honor", MODEL: "PTN-L19", BRAND: "Honor", DEVICE: "PTN-L19", PRODUCT: "PTN-L19",
+    BOARD: "pineapple", HARDWARE: "qcom",
+    FINGERPRINT: "Honor/PTN-L19/HNMagic7:15/AP3A.241105.008/15.0.0.160(C700E7R5P1):user/release-keys",
+    SDK_INT: 35, RELEASE: "15",
+    gpu: { vendor: "Qualcomm", renderer: "Adreno (TM) 830", version: "OpenGL ES 3.2 V@0830.0" }
+  },
   galaxy_s24_ultra: {
     label: "Galaxy S24 Ultra (Snapdragon 8 Gen 3)",
     MANUFACTURER: "samsung", MODEL: "SM-S928B", BRAND: "samsung", DEVICE: "e3q", PRODUCT: "e3qxxx",
@@ -112,11 +549,43 @@ const DEVICE_PRESETS = {
     SDK_INT: 34, RELEASE: "14",
     gpu: { vendor: "Qualcomm", renderer: "Adreno (TM) 750", version: "OpenGL ES 3.2 V@0750.0" }
   },
+  galaxy_s25_ultra: {
+    label: "Galaxy S25 Ultra (Snapdragon 8 Elite)",
+    MANUFACTURER: "samsung", MODEL: "SM-S938B", BRAND: "samsung", DEVICE: "e3qxxx", PRODUCT: "e3qxxx",
+    BOARD: "pineapple", HARDWARE: "qcom",
+    FINGERPRINT: "samsung/e3qxxx/e3q:15/AP3A.240905.015/S938BXXU1AXK4:user/release-keys",
+    SDK_INT: 35, RELEASE: "15",
+    gpu: { vendor: "Qualcomm", renderer: "Adreno (TM) 830", version: "OpenGL ES 3.2 V@0830.0" }
+  },
+  galaxy_s24_plus: {
+    label: "Galaxy S24+ (Exynos 2400)",
+    MANUFACTURER: "samsung", MODEL: "SM-S926B", BRAND: "samsung", DEVICE: "e2s", PRODUCT: "e2sxxx",
+    BOARD: "exynos2400", HARDWARE: "exynos2400",
+    FINGERPRINT: "samsung/e2sxxx/e2s:14/UP1A.231005.007/S926BXXU2AXL4:user/release-keys",
+    SDK_INT: 34, RELEASE: "14",
+    gpu: { vendor: "ARM", renderer: "Mali-G715 Immortalis-G715 MP7", version: "OpenGL ES 3.2 v1.r38p0-01eac0" }
+  },
   pixel_9_pro: {
     label: "Pixel 9 Pro (Tensor G4)",
     MANUFACTURER: "Google", MODEL: "Pixel 9 Pro", BRAND: "google", DEVICE: "caiman", PRODUCT: "caiman",
     BOARD: "caiman", HARDWARE: "caiman",
     FINGERPRINT: "google/caiman/caiman:17/CP3A.260905.009/16091614:user/release-keys",
+    SDK_INT: 35, RELEASE: "17",
+    gpu: { vendor: "ARM", renderer: "Mali-G715 Immortalis-G715 MC10", version: "OpenGL ES 3.2 v1.r38p0-01eac0" }
+  },
+  pixel_9_pro_xl: {
+    label: "Pixel 9 Pro XL (Tensor G4)",
+    MANUFACTURER: "Google", MODEL: "Pixel 9 Pro XL", BRAND: "google", DEVICE: "komodo", PRODUCT: "komodo",
+    BOARD: "komodo", HARDWARE: "komodo",
+    FINGERPRINT: "google/komodo/komodo:17/CP3A.260905.009/16091614:user/release-keys",
+    SDK_INT: 35, RELEASE: "17",
+    gpu: { vendor: "ARM", renderer: "Mali-G715 Immortalis-G715 MC10", version: "OpenGL ES 3.2 v1.r38p0-01eac0" }
+  },
+  pixel_9: {
+    label: "Pixel 9 (Tensor G4)",
+    MANUFACTURER: "Google", MODEL: "Pixel 9", BRAND: "google", DEVICE: "tokay", PRODUCT: "tokay",
+    BOARD: "tokay", HARDWARE: "tokay",
+    FINGERPRINT: "google/tokay/tokay:17/CP3A.260905.009/16091614:user/release-keys",
     SDK_INT: 35, RELEASE: "17",
     gpu: { vendor: "ARM", renderer: "Mali-G715 Immortalis-G715 MC10", version: "OpenGL ES 3.2 v1.r38p0-01eac0" }
   },
@@ -127,399 +596,514 @@ const DEVICE_PRESETS = {
     FINGERPRINT: "google/husky/husky:14/UD1A.230803.041/10808477:user/release-keys",
     SDK_INT: 34, RELEASE: "14",
     gpu: { vendor: "ARM", renderer: "Mali-G715 Immortalis-G715s MC10", version: "OpenGL ES 3.2 v1.r38p0-01eac0" }
+  },
+  pixel_8a: {
+    label: "Pixel 8a (Tensor G3)",
+    MANUFACTURER: "Google", MODEL: "Pixel 8a", BRAND: "google", DEVICE: "akita", PRODUCT: "akita",
+    BOARD: "akita", HARDWARE: "akita",
+    FINGERPRINT: "google/akita/akita:14/UD1A.240722.001/12211027:user/release-keys",
+    SDK_INT: 34, RELEASE: "14",
+    gpu: { vendor: "ARM", renderer: "Mali-G715 Immortalis-G715s MC10", version: "OpenGL ES 3.2 v1.r38p0-01eac0" }
+  },
+  pixel_7_pro: {
+    label: "Pixel 7 Pro (Tensor G2)",
+    MANUFACTURER: "Google", MODEL: "Pixel 7 Pro", BRAND: "google", DEVICE: "cheetah", PRODUCT: "cheetah",
+    BOARD: "cheetah", HARDWARE: "cheetah",
+    FINGERPRINT: "google/cheetah/cheetah:14/UQ1A.240105.002/10754083:user/release-keys",
+    SDK_INT: 34, RELEASE: "14",
+    gpu: { vendor: "ARM", renderer: "Mali-G710 MP10", version: "OpenGL ES 3.2 v1.r32p0-vivo.09" }
   }
 };
 
-function applyPresetToProfile(p, presetKey) {
-  const pr = DEVICE_PRESETS[presetKey];
-  if (!pr) return;
-  p.MANUFACTURER = pr.MANUFACTURER;
-  p.MODEL = pr.MODEL;
-  p.BRAND = pr.BRAND;
-  p.DEVICE = pr.DEVICE;
-  p.PRODUCT = pr.PRODUCT;
-  p.BOARD = pr.BOARD;
-  p.HARDWARE = pr.HARDWARE;
-  p.FINGERPRINT = pr.FINGERPRINT;
-  p.SDK_INT = pr.SDK_INT;
-  p.RELEASE = pr.RELEASE;
-  p.native_hooks ||= {};
-  p.native_hooks.gpu ||= {};
-  p.native_hooks.gpu.vendor = pr.gpu.vendor;
-  p.native_hooks.gpu.renderer = pr.gpu.renderer;
-  p.native_hooks.gpu.version = pr.gpu.version;
-}
+// CPU profiles (mirrors module/cpu_profiles.conf). Each entry
+// here is what the "Apply CPU Preset" picker in the Native Hooks
+// editor writes into native_hooks.props and native_hooks.uname.
 
-async function exec(cmd) {
-  if (window.ksu && ksu.exec) return (await ksu.exec(cmd)).stdout;
-  throw new Error("no root bridge — open this page in KernelSU / APatch WebUI");
-}
-const esc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    const CPU_PRESETS = {
+  sd8gen3:    { label: "Snapdragon 8 Gen 3 (SM8650)",     uname_machine: "aarch64", props: { "ro.boot.hardware.platform": "qcom", "ro.boot.hardware": "qcom" } },
+  sd8elite:   { label: "Snapdragon 8 Elite (SM8750)",    uname_machine: "aarch64", props: { "ro.boot.hardware.platform": "qcom", "ro.boot.hardware": "qcom" } },
+  sd8g2:      { label: "Snapdragon 8 Gen 2 (SM8550)",     uname_machine: "aarch64", props: { "ro.boot.hardware.platform": "qcom", "ro.boot.hardware": "qcom" } },
+  sd8g1:      { label: "Snapdragon 8 Gen 1 (SM8450)",     uname_machine: "aarch64", props: { "ro.boot.hardware.platform": "qcom", "ro.boot.hardware": "qcom" } },
+  sd865:      { label: "Snapdragon 865 (SM8250)",         uname_machine: "aarch64", props: { "ro.boot.hardware.platform": "qcom", "ro.boot.hardware": "qcom" } },
+  tensor_g4:  { label: "Google Tensor G4",                uname_machine: "aarch64", props: { "ro.boot.hardware.platform": "gs",    "ro.boot.hardware": "gs"    } },
+  tensor_g3:  { label: "Google Tensor G3",                uname_machine: "aarch64", props: { "ro.boot.hardware.platform": "gs",    "ro.boot.hardware": "gs"    } },
+  tensor_g2:  { label: "Google Tensor G2",                uname_machine: "aarch64", props: { "ro.boot.hardware.platform": "gs",    "ro.boot.hardware": "gs"    } },
+  exynos2400: { label: "Samsung Exynos 2400",             uname_machine: "aarch64", props: { "ro.boot.hardware.platform": "exynos", "ro.boot.hardware": "exynos2400" } },
+  dimensity9300: { label: "MediaTek Dimensity 9300",     uname_machine: "aarch64", props: { "ro.boot.hardware.platform": "mt6989", "ro.boot.hardware": "mt6989" } },
+  kirin9000s: { label: "HiSilicon Kirin 9000S",          uname_machine: "aarch64", props: { "ro.boot.hardware.platform": "kirin", "ro.boot.hardware": "kirin9000s" } }
+};
 
-async function load() {
-  try { document.getElementById("ver").textContent =
-    (await exec(`grep ^version= ${MOD}/module.prop`)).split("=")[1].trim(); }
-  catch (e) { /* non-fatal */ }
-  try {
-    cfg = JSON.parse(await exec(`cat ${MOD}/config.json`));
-    cfg.profiles ||= {}; cfg.apps ||= {};
-    log("config loaded", "ok");
-  } catch (e) { log("load failed: " + e.message + " — starting empty", "err"); }
-  try {
-    const out = await exec("pm list packages -3");
-    const dl = document.getElementById("pkgs");
-    dl.innerHTML = out.split("\n").filter(l => l.startsWith("package:"))
-      .map(l => `<option value="${l.slice(8).trim()}">`).join("");
-  } catch (e) { log("package list unavailable: " + e.message, "err"); }
-  render();
-}
+    function applyPresetToProfile(p, presetKey) {
+      const pr = DEVICE_PRESETS[presetKey];
+      if (!pr) return;
+      for (const [k, v] of Object.entries(pr)) {
+        if (k === "label") continue;
+        p[k] = v;
+      }
+    }
 
-function render() {
-  const f = document.getElementById("filter").value.toLowerCase();
-  const profKeys = Object.keys(cfg.profiles);
-  document.getElementById("newProfile").innerHTML =
-    profKeys.map(k => `<option>${esc(k)}</option>`).join("");
-  const box = document.getElementById("apps");
-  const entries = Object.entries(cfg.apps).filter(([p]) => p.toLowerCase().includes(f));
-  box.innerHTML = entries.length ? "" : `<div class="sub">No apps assigned yet.</div>`;
-  for (const [pkg, key] of entries) {
-    const div = document.createElement("div");
-    div.className = "card";
-    div.innerHTML = `<div class="row"><code class="grow">${esc(pkg)}</code>
-      <select>${profKeys.map(k =>
-        `<option${k === key ? " selected" : ""}>${esc(k)}</option>`).join("")}</select>
-      <button class="danger">✕</button></div>`;
-    const [sel, btn] = [div.querySelector("select"), div.querySelector("button")];
-    sel.onchange = () => { cfg.apps[pkg] = sel.value; log(`${pkg} → ${sel.value}`); };
-    btn.onclick = () => { delete cfg.apps[pkg]; render(); };
-    box.appendChild(div);
-  }
-  const pb = document.getElementById("profiles");
-  pb.innerHTML = `<div class="sub" style="color:#fbbf24">⚠️ Native hooks are resident inline hooks — use at your own risk. Never enable for anti-cheat games.</div>`;
-  for (const [k, p] of Object.entries(cfg.profiles)) {
-    p.native_hooks ||= {};
-    const nh = p.native_hooks;
-    nh.uname ||= {}; nh.props ||= {}; nh.gpu ||= {};
-    nh.telephony ||= {}; nh.id ||= {}; nh.drm ||= {}; nh.location ||= {};
+    function applyCpuPresetToProfile(p, presetKey) {
+      const pr = CPU_PRESETS[presetKey];
+      if (!pr) return;
+      p.native_hooks ||= {};
+      p.native_hooks.uname ||= {};
+      p.native_hooks.props ||= {};
+      p.native_hooks.uname.machine = pr.uname_machine;
+      for (const [k, v] of Object.entries(pr.props)) {
+        p.native_hooks.props[k] = v;
+      }
+    }
 
-    const d = document.createElement("div");
-    d.className = "card";
-    d.innerHTML = `
-      <div class="row">
-        <b class="grow" style="font-size:1.05rem">${esc(k)}</b>
-        <select data-apply-preset style="font-size:12px; padding:4px 8px; max-width:180px">
-          <option value="">⚡ Apply Preset...</option>
-          <option value="redmagic_9_pro">RedMagic 9 Pro</option>
-          <option value="rog_phone_8_pro">ROG Phone 8 Pro</option>
-          <option value="galaxy_s24_ultra">Galaxy S24 Ultra</option>
-          <option value="pixel_9_pro">Pixel 9 Pro</option>
-          <option value="pixel_8_pro">Pixel 8 Pro</option>
-        </select>
-        <button class="danger" data-del-profile style="padding:4px 10px; font-size:12px">Delete</button>
-      </div>
-      <div class="prof">
-        MODEL <b>${esc(p.MODEL || "-")}</b> · BRAND <b>${esc(p.BRAND || "-")}</b><br>
-        FINGERPRINT <b>${esc((p.FINGERPRINT || "-").slice(0, 55))}…</b><br>
-        Android <b>${esc(p.RELEASE || "-")}</b> (SDK <b>${esc(String(p.SDK_INT ?? "-"))}</b>)
-      </div>
+    // Root Bridge
+    async function exec(cmd) {
+      if (window.ksu && ksu.exec) {
+        return (await ksu.exec(cmd)).stdout;
+      }
+      throw new Error("Tidak ada root bridge (Buka halaman ini lewat WebUI KernelSU / APatch / Magisk)");
+    }
 
-      <details>
-        <summary class="prof" style="margin-top:6px; color:#a5b4fc">⚙️ Edit Build Fields (Hardware Identity)</summary>
-        <div class="row"><span class="prof grow">MANUFACTURER</span>
-          <input data-bf="MANUFACTURER" value="${esc(p.MANUFACTURER || "")}" placeholder="Google" style="width:180px"></div>
-        <div class="row"><span class="prof grow">MODEL</span>
-          <input data-bf="MODEL" value="${esc(p.MODEL || "")}" placeholder="Pixel 9 Pro" style="width:180px"></div>
-        <div class="row"><span class="prof grow">BRAND</span>
-          <input data-bf="BRAND" value="${esc(p.BRAND || "")}" placeholder="google" style="width:180px"></div>
-        <div class="row"><span class="prof grow">DEVICE</span>
-          <input data-bf="DEVICE" value="${esc(p.DEVICE || "")}" placeholder="caiman" style="width:180px"></div>
-        <div class="row"><span class="prof grow">PRODUCT</span>
-          <input data-bf="PRODUCT" value="${esc(p.PRODUCT || "")}" placeholder="caiman" style="width:180px"></div>
-        <div class="row"><span class="prof grow">BOARD</span>
-          <input data-bf="BOARD" value="${esc(p.BOARD || "")}" placeholder="caiman" style="width:180px"></div>
-        <div class="row"><span class="prof grow">HARDWARE</span>
-          <input data-bf="HARDWARE" value="${esc(p.HARDWARE || "")}" placeholder="caiman" style="width:180px"></div>
-        <div class="row"><span class="prof grow">FINGERPRINT</span>
-          <input data-bf="FINGERPRINT" value="${esc(p.FINGERPRINT || "")}" placeholder="google/caiman/..." style="width:180px"></div>
-        <div class="row"><span class="prof grow">SDK_INT</span>
-          <input data-bf="SDK_INT" value="${esc(p.SDK_INT ?? "")}" placeholder="35" style="width:180px"></div>
-        <div class="row"><span class="prof grow">RELEASE</span>
-          <input data-bf="RELEASE" value="${esc(p.RELEASE || "")}" placeholder="17" style="width:180px"></div>
-      </details>
+    function showToast(msg, type = "ok") {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.className = "show " + type;
+      setTimeout(() => { t.className = ""; }, 3000);
+    }
 
-      <details>
-        <summary class="prof" style="margin-top:6px; color:#38bdf8">🎮 Native Hooks &amp; PRO Hardware Spoof</summary>
-        
-        <div class="prof" style="margin-top:8px; color:#38bdf8">🎮 GPU Spoofing (OpenGL / Vulkan)</div>
-        <div class="row"><span class="prof grow">GPU Renderer</span>
-          <input data-nh="gpu-renderer" value="${esc(nh.gpu?.renderer || "")}" placeholder="Adreno (TM) 750" style="width:180px"></div>
-        <div class="row"><span class="prof grow">GPU Vendor</span>
-          <input data-nh="gpu-vendor" value="${esc(nh.gpu?.vendor || "")}" placeholder="Qualcomm" style="width:180px"></div>
-        <div class="row"><span class="prof grow">GLES Version</span>
-          <input data-nh="gpu-version" value="${esc(nh.gpu?.version || "")}" placeholder="OpenGL ES 3.2 V@0750.0" style="width:180px"></div>
+    // Tab switcher
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
+        btn.classList.add("active");
+        const tabId = btn.dataset.tab;
+        document.getElementById(tabId).classList.add("active");
+        currentTab = tabId;
+        if (tabId === "tab-diag") refreshDiagnostics();
+      };
+    });
 
-        <div class="prof" style="margin-top:8px; color:#a78bfa">📱 Identity &amp; Telephony (PRO Tier)</div>
-        <div class="row"><span class="prof grow">Android ID</span>
-          <input data-nh="android-id" value="${esc(nh.id?.android_id || "")}" placeholder="16-hex digits" style="width:180px"></div>
-        <div class="row"><span class="prof grow">Hardware MAC</span>
-          <input data-nh="mac" value="${esc(nh.id?.mac_address || "")}" placeholder="02:42:AC:11:00:2A" style="width:180px"></div>
-        <div class="row"><span class="prof grow">IMEI</span>
-          <input data-nh="imei" value="${esc(nh.telephony?.imei || "")}" placeholder="15 digits" style="width:180px"></div>
-        <div class="row"><span class="prof grow">SIM Operator</span>
-          <input data-nh="sim-op" value="${esc(nh.telephony?.sim_operator || "")}" placeholder="310260" style="width:180px"></div>
-        <div class="row"><span class="prof grow">Operator Name</span>
-          <input data-nh="sim-name" value="${esc(nh.telephony?.sim_operator_name || "")}" placeholder="T-Mobile" style="width:180px"></div>
-        <div class="row"><span class="prof grow">Google Ad ID (GAID)</span>
-          <input data-nh="gaid" value="${esc(nh.id?.gaid || "")}" placeholder="a1b2c3d4-e5f6-..." style="width:180px"></div>
+    // Load initial data
+    async function load() {
+      try {
+        const verStr = await exec("grep ^version= " + MOD + "/module.prop");
+        document.getElementById("modVer").textContent = verStr.split("=")[1].trim();
+      } catch (e) {}
 
-        <div class="prof" style="margin-top:8px; color:#f43f5e">🎬 Widevine / DRM (PRO Tier)</div>
-        <div class="row"><span class="prof grow">Security Level</span>
-          <select data-nh="drm-sec" style="width:180px">
-            <option value=""${!nh.drm?.security_level ? " selected" : ""}>Default / None</option>
-            <option value="L1"${nh.drm?.security_level === "L1" ? " selected" : ""}>L1 (Hardware/HD)</option>
-            <option value="L3"${nh.drm?.security_level === "L3" ? " selected" : ""}>L3 (Software/SD)</option>
-          </select></div>
-        <div class="row"><span class="prof grow">DRM System ID</span>
-          <input data-nh="drm-sysid" value="${esc(nh.drm?.system_id || "")}" placeholder="4266" style="width:180px"></div>
-        <div class="row"><span class="prof grow">DRM Vendor</span>
-          <input data-nh="drm-vendor" value="${esc(nh.drm?.vendor || "")}" placeholder="Google" style="width:180px"></div>
+      try {
+        const raw = await exec("cat " + MOD + "/config.json");
+        cfg = JSON.parse(raw);
+        cfg.profiles ||= {};
+        cfg.apps ||= {};
+        showToast("Konfigurasi berhasil dimuat", "ok");
+      } catch (e) {
+        showToast("Config kosong atau gagal dibaca: " + e.message, "err");
+      }
 
-        <div class="prof" style="margin-top:8px; color:#10b981">📍 Geolocation &amp; Cell (PRO Tier)</div>
-        <div class="row"><span class="prof grow">Latitude</span>
-          <input data-nh="lat" value="${esc(nh.location?.latitude ?? "")}" placeholder="37.7749" style="width:180px"></div>
-        <div class="row"><span class="prof grow">Longitude</span>
-          <input data-nh="lon" value="${esc(nh.location?.longitude ?? "")}" placeholder="-122.4194" style="width:180px"></div>
-        <div class="row"><span class="prof grow">Cell Tower LAC</span>
-          <input data-nh="cell-lac" value="${esc(nh.location?.lac || "")}" placeholder="12345" style="width:180px"></div>
-        <div class="row"><span class="prof grow">Cell Tower CID</span>
-          <input data-nh="cell-cid" value="${esc(nh.location?.cid || "")}" placeholder="67890" style="width:180px"></div>
+      initPresetPickers();
+      renderAll();
+      loadInstalledPackages("3rd");
+    }
 
-        <div class="prof" style="margin-top:8px; color:#9a9ab0">⏱️ Low-level System &amp; Uptime</div>
-        <div class="row"><span class="prof grow">Uptime offset (seconds)</span>
-          <input data-nh="uptime" type="number" value="${esc(nh.uptime_offset_sec ?? "")}" placeholder="0" style="width:180px"></div>
-        <div class="row"><span class="prof grow">Kernel machine (uname)</span>
-          <input data-nh="machine" value="${esc(nh.uname?.machine || "")}" placeholder="aarch64" style="width:180px"></div>
-        <div class="row"><span class="prof grow">Kernel sysname (uname)</span>
-          <input data-nh="sysname" value="${esc(nh.uname?.sysname || "")}" placeholder="Linux" style="width:180px"></div>
+    function initPresetPickers() {
+      const dp = document.getElementById("presetPicker");
+      dp.innerHTML = '<option value="">-- Pilih Preset Cepat --</option>';
+      for (const [k, v] of Object.entries(DEVICE_PRESETS)) {
+        dp.innerHTML += '<option value="' + k + '">' + v.label + '</option>';
+      }
 
-        <div class="prof" style="margin-top:8px; color:#9a9ab0">Custom system properties (__system_property_get)</div>
-        <div data-props></div>
-        <div class="row"><button data-addprop class="grow" style="background:#27273a">+ Add property</button></div>
-      </details>`;
+      const cp = document.getElementById("cpuPresetPicker");
+      cp.innerHTML = '<option value="">-- Pilih SoC CPU --</option>';
+      for (const [k, v] of Object.entries(CPU_PRESETS)) {
+        cp.innerHTML += '<option value="' + k + '">' + v.label + '</option>';
+      }
+    }
 
-    const q = sel => d.querySelector(sel);
-    const onch = (sel, fn) => {
-      const el = q(sel);
-      if (el) el.onchange = fn;
+    function renderAll() {
+      const profKeys = Object.keys(cfg.profiles);
+      if (!activeProfileKey && profKeys.length > 0) {
+        activeProfileKey = profKeys[0];
+      }
+
+      // 1. Render Global Switch & Dropdown
+      const isGlobal = !!cfg.apps["*"];
+      const globalToggle = document.getElementById("globalToggle");
+      const globalSettings = document.getElementById("globalSettings");
+      const globalProfileSelect = document.getElementById("globalProfileSelect");
+      globalToggle.checked = isGlobal;
+      globalSettings.style.display = isGlobal ? "block" : "none";
+
+      globalProfileSelect.innerHTML = "";
+      profKeys.forEach(k => {
+        const sel = (cfg.apps["*"] === k) ? "selected" : "";
+        globalProfileSelect.innerHTML += '<option value="' + k + '" ' + sel + '>' + k + '</option>';
+      });
+
+      // 2. Render Apps Table
+      renderAppsTable();
+
+      // 3. Render Profile Selectors
+      const activeProfSelect = document.getElementById("activeProfSelect");
+      const manualProf = document.getElementById("manualProf");
+      activeProfSelect.innerHTML = "";
+      manualProf.innerHTML = '<option value="none">🚫 None (Kecualikan)</option>';
+
+      profKeys.forEach(k => {
+        const selActive = (k === activeProfileKey) ? "selected" : "";
+        activeProfSelect.innerHTML += '<option value="' + k + '" ' + selActive + '>' + k + '</option>';
+        manualProf.innerHTML += '<option value="' + k + '">' + k + '</option>';
+      });
+
+      renderProfileFields();
+    }
+
+    function renderAppsTable() {
+      const tbody = document.getElementById("appTableBody");
+      tbody.innerHTML = "";
+      const filter = (document.getElementById("appFilter").value || "").toLowerCase();
+      const profKeys = Object.keys(cfg.profiles);
+
+      const entries = Object.entries(cfg.apps);
+      if (entries.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--muted); padding:20px;">Belum ada aplikasi yang di-mapping.</td></tr>';
+        return;
+      }
+
+      for (const [pkg, profileKey] of entries) {
+        if (pkg === "*") continue; // Diatur di banner global
+        if (filter && !pkg.toLowerCase().includes(filter)) continue;
+
+        let options = '<option value="none" ' + (profileKey === "none" ? "selected" : "") + '>🚫 None (Kecualikan)</option>';
+        for (const k of profKeys) {
+          options += '<option value="' + k + '" ' + (profileKey === k ? "selected" : "") + '>' + k + '</option>';
+        }
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><span class="pkg-mono">${pkg}</span></td>
+          <td>
+            <select class="app-prof-select" data-pkg="${pkg}" style="padding:4px 8px; font-size:12px;">
+              ${options}
+            </select>
+          </td>
+          <td style="text-align:center;">
+            <button class="danger sm" data-del="${pkg}" style="padding:4px 8px;">✕</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      }
+
+      // Event listeners in table
+      tbody.querySelectorAll(".app-prof-select").forEach(sel => {
+        sel.onchange = (e) => {
+          cfg.apps[e.target.dataset.pkg] = e.target.value;
+        };
+      });
+      tbody.querySelectorAll("button[data-del]").forEach(btn => {
+        btn.onclick = (e) => {
+          delete cfg.apps[e.target.dataset.del];
+          renderAppsTable();
+          showToast("Aplikasi dihapus dari mapping", "ok");
+        };
+      });
+    }
+
+    function renderProfileFields() {
+      const p = cfg.profiles[activeProfileKey];
+      if (!p) return;
+
+      // Build fields
+      document.querySelectorAll("[data-field]").forEach(input => {
+        const f = input.dataset.field;
+        input.value = p[f] !== undefined ? p[f] : "";
+        input.oninput = (e) => {
+          if (f === "SDK_INT") p[f] = parseInt(e.target.value, 10) || 0;
+          else p[f] = e.target.value;
+        };
+      });
+
+      // Native hooks
+      const nh = p.native_hooks || {};
+      const refSel = document.getElementById("nh_refresh_rate");
+      refSel.value = nh.refresh_rate_hz || 0;
+      refSel.onchange = (e) => {
+        nh.refresh_rate_hz = parseInt(e.target.value, 10);
+        p.native_hooks = nh;
+      };
+
+      const fsSel = document.getElementById("nh_flag_secure");
+      fsSel.value = nh.disable_flag_secure ? "true" : "false";
+      fsSel.onchange = (e) => {
+        nh.disable_flag_secure = e.target.value === "true";
+        p.native_hooks = nh;
+      };
+
+      const gpu = nh.gpu || {};
+      const gVen = document.getElementById("nh_gpu_vendor");
+      const gRen = document.getElementById("nh_gpu_renderer");
+      const gVer = document.getElementById("nh_gpu_version");
+      gVen.value = gpu.vendor || "";
+      gRen.value = gpu.renderer || "";
+      gVer.value = gpu.version || "";
+      const updateGpu = () => {
+        nh.gpu = { vendor: gVen.value, renderer: gRen.value, version: gVer.value };
+        p.native_hooks = nh;
+      };
+      gVen.oninput = updateGpu; gRen.oninput = updateGpu; gVer.oninput = updateGpu;
+
+      const id = nh.id || {};
+      const aId = document.getElementById("nh_android_id");
+      aId.value = id.android_id || "";
+      aId.oninput = (e) => {
+        nh.id = { ...id, android_id: e.target.value };
+        p.native_hooks = nh;
+      };
+
+      const lang = document.getElementById("nh_language");
+      lang.value = nh.language || "";
+      lang.oninput = (e) => {
+        nh.language = e.target.value;
+        p.native_hooks = nh;
+      };
+
+      const up = document.getElementById("nh_uptime");
+      up.value = nh.uptime_offset_sec || 0;
+      up.oninput = (e) => {
+        nh.uptime_offset_sec = parseInt(e.target.value, 10) || 0;
+        p.native_hooks = nh;
+      };
+
+      const un = nh.uname || {};
+      const unm = document.getElementById("nh_uname_machine");
+      unm.value = un.machine || "";
+      unm.oninput = (e) => {
+        nh.uname = { ...un, machine: e.target.value };
+        p.native_hooks = nh;
+      };
+    }
+
+    // Global toggle switch handler
+    document.getElementById("globalToggle").onchange = (e) => {
+      const active = e.target.checked;
+      const profKeys = Object.keys(cfg.profiles);
+      if (active) {
+        const chosen = document.getElementById("globalProfileSelect").value || profKeys[0] || "default";
+        cfg.apps["*"] = chosen;
+      } else {
+        delete cfg.apps["*"];
+      }
+      renderAll();
+      showToast(active ? "Mode Global Aktif" : "Mode Global Dinonaktifkan", "ok");
     };
 
-    // Preset application
-    q('[data-apply-preset]').onchange = e => {
-      const val = e.target.value;
-      if (!val) return;
-      applyPresetToProfile(p, val);
-      render();
-      log(`applied preset ${val} to profile ${k}`, "ok");
+    document.getElementById("globalProfileSelect").onchange = (e) => {
+      if (cfg.apps["*"]) {
+        cfg.apps["*"] = e.target.value;
+        showToast("Profil Global diubah ke: " + e.target.value, "ok");
+      }
+    };
+
+    // App search filter
+    document.getElementById("appFilter").oninput = renderAppsTable;
+
+    // Add manual app button
+    document.getElementById("addManualAppBtn").onclick = () => {
+      const pkg = document.getElementById("manualPkg").value.trim();
+      const prof = document.getElementById("manualProf").value;
+      if (!pkg) return showToast("Masukkan package name!", "err");
+      cfg.apps[pkg] = prof;
+      document.getElementById("manualPkg").value = "";
+      renderAppsTable();
+      showToast("Berhasil menambahkan " + pkg, "ok");
+    };
+
+    // Profile selector change
+    document.getElementById("activeProfSelect").onchange = (e) => {
+      activeProfileKey = e.target.value;
+      renderProfileFields();
+    };
+
+    // Apply quick preset
+    document.getElementById("presetPicker").onchange = (e) => {
+      const k = e.target.value;
+      if (!k || !cfg.profiles[activeProfileKey]) return;
+      applyPresetToProfile(cfg.profiles[activeProfileKey], k);
+      renderProfileFields();
+      showToast("Preset " + DEVICE_PRESETS[k].label + " diterapkan", "ok");
+    };
+
+    // Apply CPU preset
+    document.getElementById("cpuPresetPicker").onchange = (e) => {
+      const k = e.target.value;
+      if (!k || !cfg.profiles[activeProfileKey]) return;
+      applyCpuPresetToProfile(cfg.profiles[activeProfileKey], k);
+      renderProfileFields();
+      showToast("Preset CPU " + CPU_PRESETS[k].label + " diterapkan", "ok");
+    };
+
+    // Create profile
+    document.getElementById("createProfBtn").onclick = () => {
+      const name = document.getElementById("newProfName").value.trim();
+      if (!name) return showToast("Masukkan nama profil!", "err");
+      if (cfg.profiles[name]) return showToast("Profil sudah ada!", "err");
+
+      cfg.profiles[name] = {
+        MANUFACTURER: "Google", MODEL: name, BRAND: "google",
+        DEVICE: name.toLowerCase(), PRODUCT: name.toLowerCase(), BOARD: name.toLowerCase(),
+        HARDWARE: name.toLowerCase(), FINGERPRINT: "google/" + name.toLowerCase() + "/" + name.toLowerCase() + ":14/UP1A.231005.007/1:user/release-keys",
+        SDK_INT: 34, RELEASE: "14", native_hooks: {}
+      };
+      document.getElementById("newProfName").value = "";
+      activeProfileKey = name;
+      renderAll();
+      showToast("Profil " + name + " dibuat!", "ok");
     };
 
     // Delete profile
-    q('[data-del-profile]').onclick = () => {
-      delete cfg.profiles[k];
-      for (const [pkg, prof] of Object.entries(cfg.apps)) {
-        if (prof === k) delete cfg.apps[pkg];
-      }
-      render();
-      log(`deleted profile ${k}`, "ok");
+    document.getElementById("deleteProfBtn").onclick = () => {
+      if (!activeProfileKey) return;
+      if (Object.keys(cfg.profiles).length <= 1) return showToast("Minimal harus ada satu profil!", "err");
+      delete cfg.profiles[activeProfileKey];
+      activeProfileKey = Object.keys(cfg.profiles)[0];
+      renderAll();
+      showToast("Profil dihapus", "ok");
     };
 
-    // Build fields
-    ['MANUFACTURER', 'MODEL', 'BRAND', 'DEVICE', 'PRODUCT', 'BOARD', 'HARDWARE', 'FINGERPRINT', 'RELEASE'].forEach(bf => {
-      onch(`[data-bf="${bf}"]`, e => { p[bf] = e.target.value.trim(); });
-    });
-    onch('[data-bf="SDK_INT"]', e => {
-      const num = parseInt(e.target.value, 10);
-      p.SDK_INT = isNaN(num) ? 0 : num;
-    });
-
-    // Native & PRO hooks
-    onch('[data-nh="android-id"]', e => {
-      nh.id.android_id = e.target.value.trim();
-      if (!nh.id.android_id) delete nh.id.android_id;
-    });
-    onch('[data-nh="mac"]', e => {
-      nh.id.mac_address = e.target.value.trim();
-      if (!nh.id.mac_address) delete nh.id.mac_address;
-    });
-    onch('[data-nh="gaid"]', e => {
-      nh.id.gaid = e.target.value.trim();
-      if (!nh.id.gaid) delete nh.id.gaid;
-    });
-    onch('[data-nh="imei"]', e => {
-      nh.telephony.imei = e.target.value.trim();
-      if (!nh.telephony.imei) delete nh.telephony.imei;
-    });
-    onch('[data-nh="sim-op"]', e => {
-      nh.telephony.sim_operator = e.target.value.trim();
-      if (!nh.telephony.sim_operator) delete nh.telephony.sim_operator;
-    });
-    onch('[data-nh="sim-name"]', e => {
-      nh.telephony.sim_operator_name = e.target.value.trim();
-      if (!nh.telephony.sim_operator_name) delete nh.telephony.sim_operator_name;
-    });
-    onch('[data-nh="drm-sec"]', e => {
-      nh.drm.security_level = e.target.value;
-      if (!nh.drm.security_level) delete nh.drm.security_level;
-    });
-    onch('[data-nh="drm-sysid"]', e => {
-      const val = parseInt(e.target.value, 10);
-      if (isNaN(val)) delete nh.drm.system_id; else nh.drm.system_id = val;
-    });
-    onch('[data-nh="drm-vendor"]', e => {
-      nh.drm.vendor = e.target.value.trim();
-      if (!nh.drm.vendor) delete nh.drm.vendor;
-    });
-    onch('[data-nh="lat"]', e => {
-      const v = parseFloat(e.target.value);
-      if (isNaN(v)) delete nh.location.latitude; else nh.location.latitude = v;
-    });
-    onch('[data-nh="lon"]', e => {
-      const v = parseFloat(e.target.value);
-      if (isNaN(v)) delete nh.location.longitude; else nh.location.longitude = v;
-    });
-    onch('[data-nh="cell-lac"]', e => {
-      const v = parseInt(e.target.value, 10);
-      if (isNaN(v)) delete nh.location.lac; else nh.location.lac = v;
-    });
-    onch('[data-nh="cell-cid"]', e => {
-      const v = parseInt(e.target.value, 10);
-      if (isNaN(v)) delete nh.location.cid; else nh.location.cid = v;
-    });
-    onch('[data-nh="gpu-renderer"]', e => {
-      nh.gpu.renderer = e.target.value.trim();
-      if (!nh.gpu.renderer) delete nh.gpu.renderer;
-    });
-    onch('[data-nh="gpu-vendor"]', e => {
-      nh.gpu.vendor = e.target.value.trim();
-      if (!nh.gpu.vendor) delete nh.gpu.vendor;
-    });
-    onch('[data-nh="gpu-version"]', e => {
-      nh.gpu.version = e.target.value.trim();
-      if (!nh.gpu.version) delete nh.gpu.version;
-    });
-    onch('[data-nh="uptime"]', e => {
-      const v = parseInt(e.target.value, 10);
-      if (isNaN(v) || v === 0) delete nh.uptime_offset_sec; else nh.uptime_offset_sec = v;
-    });
-    onch('[data-nh="machine"]', e => {
-      nh.uname.machine = e.target.value.trim();
-      if (!nh.uname.machine) delete nh.uname.machine;
-    });
-    onch('[data-nh="sysname"]', e => {
-      nh.uname.sysname = e.target.value.trim();
-      if (!nh.uname.sysname) delete nh.uname.sysname;
-    });
-
-    const propsBox = q('[data-props]');
-    const renderProps = () => {
-      propsBox.innerHTML = "";
-      for (const [pk, pv] of Object.entries(nh.props)) {
-        const r = document.createElement("div");
-        r.className = "row";
-        r.innerHTML = `<input class="grow" value="${esc(pk)}" data-pk placeholder="ro.product.model">` +
-          `<input class="grow" value="${esc(pv)}" data-pv placeholder="value"><button class="danger">✕</button>`;
-        const ki = r.querySelector("[data-pk]"), vi = r.querySelector("[data-pv]"),
-              btn = r.querySelector("button");
-        ki.onchange = () => {
-          const nv = vi.value;
-          delete nh.props[pk];
-          if (ki.value.trim()) nh.props[ki.value.trim()] = nv;
-          renderProps();
-        };
-        vi.onchange = () => { nh.props[pk] = vi.value; };
-        btn.onclick = () => { delete nh.props[pk]; renderProps(); };
-        propsBox.appendChild(r);
+    // Randomize Android ID
+    document.getElementById("randomizeAndroidIdBtn").onclick = () => {
+      const rand = Array.from({length: 16}, () => Math.floor(Math.random() * 16).toString(16)).join('');
+      document.getElementById("nh_android_id").value = rand;
+      if (cfg.profiles[activeProfileKey]) {
+        cfg.profiles[activeProfileKey].native_hooks ||= {};
+        cfg.profiles[activeProfileKey].native_hooks.id ||= {};
+        cfg.profiles[activeProfileKey].native_hooks.id.android_id = rand;
       }
+      showToast("Android ID diacak: " + rand, "ok");
     };
-    renderProps();
-    q('[data-addprop]').onclick = () => { nh.props["ro.product.model"] = ""; renderProps(); };
-    pb.appendChild(d);
-  }
-}
 
-document.getElementById("filter").oninput = render;
+    // APP PICKER MODAL LOGIC
+    const pickerModal = document.getElementById("pickerModal");
+    document.getElementById("openPickerBtn").onclick = () => {
+      pickerModal.classList.add("active");
+      renderPickerList();
+    };
+    document.getElementById("closePickerBtn").onclick = () => pickerModal.classList.remove("active");
+    document.getElementById("donePickerBtn").onclick = () => {
+      pickerModal.classList.remove("active");
+      renderAppsTable();
+    };
 
-// Add App Assignment
-document.getElementById("add").onclick = () => {
-  const pkg = document.getElementById("pkg").value.trim();
-  const key = document.getElementById("newProfile").value;
-  if (!pkg) return log("enter a package name", "err");
-  if (!key) return log("no profiles defined", "err");
-  cfg.apps[pkg] = key;
-  document.getElementById("pkg").value = "";
-  render();
-  log(`added ${pkg} → ${key}`, "ok");
-};
+    async function loadInstalledPackages(type = "3rd") {
+      try {
+        let flag = "-3";
+        if (type === "system") flag = "-s";
+        else if (type === "all") flag = "";
 
-// Add Profile with optional preset
-document.getElementById("addProfBtn").onclick = () => {
-  const name = document.getElementById("newProfName").value.trim();
-  const presetKey = document.getElementById("newProfPreset").value;
-  if (!name) return log("enter a profile name", "err");
-  if (cfg.profiles[name]) return log(`profile '${name}' already exists`, "err");
-  
-  cfg.profiles[name] = {
-    MANUFACTURER: "Google",
-    MODEL: name,
-    BRAND: "google",
-    DEVICE: name.toLowerCase(),
-    PRODUCT: name.toLowerCase(),
-    BOARD: name.toLowerCase(),
-    HARDWARE: name.toLowerCase(),
-    FINGERPRINT: `google/${name.toLowerCase()}/${name.toLowerCase()}:14/UP1A.231005.007/1:user/release-keys`,
-    SDK_INT: 34,
-    RELEASE: "14",
-    native_hooks: {}
-  };
-  if (presetKey) {
-    applyPresetToProfile(cfg.profiles[name], presetKey);
-  }
-  document.getElementById("newProfName").value = "";
-  render();
-  log(`created profile '${name}'${presetKey ? ` from preset ${presetKey}` : ''}`, "ok");
-};
-
-// Save config
-document.getElementById("save").onclick = async () => {
-  const btn = document.getElementById("save");
-  btn.disabled = true;
-  try {
-    // Prune empty native_hooks so untouched profiles stay clean.
-    for (const p of Object.values(cfg.profiles)) {
-      const nh = p.native_hooks;
-      if (!nh) continue;
-      if (nh.uname && !nh.uname.machine && !nh.uname.sysname) delete nh.uname;
-      if (nh.props && Object.keys(nh.props).length === 0) delete nh.props;
-      if (nh.gpu && !nh.gpu.renderer && !nh.gpu.vendor && !nh.gpu.version) delete nh.gpu;
-      if (nh.telephony && !nh.telephony.imei && !nh.telephony.imsi && !nh.telephony.iccid && !nh.telephony.sim_operator && !nh.telephony.sim_operator_name) delete nh.telephony;
-      if (nh.id && !nh.id.android_id && !nh.id.mac_address && !nh.id.gaid) delete nh.id;
-      if (nh.drm && !nh.drm.security_level && !nh.drm.system_id && !nh.drm.vendor) delete nh.drm;
-      if (nh.location && nh.location.latitude === undefined && nh.location.longitude === undefined && !nh.location.lac && !nh.location.cid) delete nh.location;
-
-      const hasAny = nh.uptime_offset_sec || nh.uname || (nh.props && Object.keys(nh.props).length) ||
-                     nh.gpu || nh.telephony || nh.id || nh.drm || nh.location;
-      if (!hasAny) delete p.native_hooks;
+        const out = await exec("pm list packages " + flag);
+        installedApps = out.split("\n")
+          .filter(l => l.startsWith("package:"))
+          .map(l => l.slice(8).trim())
+          .filter(Boolean)
+          .sort();
+        renderPickerList();
+      } catch (e) {
+        document.getElementById("pickerList").innerHTML = '<div style="color:var(--danger); text-align:center;">Gagal membaca paket: ' + e.message + '</div>';
+      }
     }
-    // Atomic write: base64 -> tmp -> mv
-    const body = JSON.stringify(cfg, null, 2);
-    const b64 = btoa(unescape(encodeURIComponent(body)));
-    await exec(`echo '${b64}' | base64 -d > ${MOD}/config.json.tmp && ` +
-               `mv ${MOD}/config.json.tmp ${MOD}/config.json && chmod 0644 ${MOD}/config.json`);
-    log("saved. Relaunch assigned apps to apply.", "ok");
-  } catch (e) { log("save failed: " + e.message, "err"); }
-  btn.disabled = false;
-};
 
-load();
-</script>
+    document.getElementById("pickerTypeSelect").onchange = (e) => {
+      loadInstalledPackages(e.target.value);
+    };
+
+    document.getElementById("pickerSearch").oninput = renderPickerList;
+
+    function renderPickerList() {
+      const container = document.getElementById("pickerList");
+      const filter = (document.getElementById("pickerSearch").value || "").toLowerCase();
+      const filtered = installedApps.filter(p => !filter || p.toLowerCase().includes(filter));
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div style="text-align:center; color:var(--muted); padding:20px;">Tidak ada aplikasi yang cocok.</div>';
+        return;
+      }
+
+      container.innerHTML = "";
+      filtered.slice(0, 100).forEach(pkg => {
+        const isAdded = cfg.apps[pkg] !== undefined;
+        const currentProf = cfg.apps[pkg] || "";
+        const div = document.createElement("div");
+        div.className = "app-item";
+        div.innerHTML = `
+          <div class="app-info">
+            <div class="app-pkg">${pkg}</div>
+            <div class="app-status">${isAdded ? 'Sudah ditargetkan (' + currentProf + ')' : 'Belum di-spoof'}</div>
+          </div>
+          <button class="sm ${isAdded ? '' : 'primary'}" data-pick="${pkg}">
+            ${isAdded ? 'Perbarui' : '+ Pilih'}
+          </button>
+        `;
+        div.querySelector("button").onclick = () => {
+          cfg.apps[pkg] = activeProfileKey || Object.keys(cfg.profiles)[0] || "default";
+          renderPickerList();
+          renderAppsTable();
+          showToast(`${pkg} diarahkan ke ${cfg.apps[pkg]}`, "ok");
+        };
+        container.appendChild(div);
+      });
+    }
+
+    // DIAGNOSTICS & LOGS
+    async function refreshDiagnostics() {
+      const profCount = Object.keys(cfg.profiles).length;
+      document.getElementById("diagProfCount").textContent = profCount;
+      document.getElementById("diagGlobalStatus").textContent = cfg.apps["*"] ? "Aktif (" + cfg.apps["*"] + ")" : "Nonaktif";
+
+      try {
+        const out = await exec("logcat -d -s OpenSpoof:D Zygisk:D | tail -n 60");
+        document.getElementById("logBox").textContent = out || "Belum ada log OpenSpoof.";
+      } catch (e) {
+        document.getElementById("logBox").textContent = "Gagal mengambil log: " + e.message;
+      }
+    }
+
+    document.getElementById("refreshLogBtn").onclick = refreshDiagnostics;
+    document.getElementById("clearLogBtn").onclick = async () => {
+      try {
+        await exec("logcat -c");
+        document.getElementById("logBox").textContent = "Log dibersihkan.";
+        showToast("Logcat dibersihkan", "ok");
+      } catch (e) {
+        showToast("Gagal bersihkan log: " + e.message, "err");
+      }
+    };
+
+    // SAVE CONFIG
+    document.getElementById("saveBtn").onclick = async () => {
+      const btn = document.getElementById("saveBtn");
+      btn.disabled = true;
+      try {
+        // Prune clean
+        for (const p of Object.values(cfg.profiles)) {
+          const nh = p.native_hooks;
+          if (!nh) continue;
+          if (nh.uname && !nh.uname.machine && !nh.uname.sysname) delete nh.uname;
+          if (nh.gpu && !nh.gpu.renderer && !nh.gpu.vendor && !nh.gpu.version) delete nh.gpu;
+          if (nh.id && !nh.id.android_id && !nh.id.mac_address && !nh.id.gaid) delete nh.id;
+          const hasAny = nh.uptime_offset_sec || nh.uname || nh.gpu || nh.id || nh.refresh_rate_hz || nh.language || nh.disable_flag_secure;
+          if (!hasAny) delete p.native_hooks;
+        }
+
+        const body = JSON.stringify(cfg, null, 2);
+        const b64 = btoa(unescape(encodeURIComponent(body)));
+        await exec("echo '" + b64 + "' | base64 -d > " + MOD + "/config.json.tmp && " +
+                  "mv " + MOD + "/config.json.tmp " + MOD + "/config.json && chmod 0644 " + MOD + "/config.json");
+        showToast("Konfigurasi tersimpan! Buka ulang aplikasi target.", "ok");
+      } catch (e) {
+        showToast("Gagal menyimpan: " + e.message, "err");
+      }
+      btn.disabled = false;
+    };
+
+    load();
+  </script>
 </body>
 </html>

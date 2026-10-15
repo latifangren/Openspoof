@@ -389,7 +389,22 @@ public:
         Config cfg = LoadConfig(MODULE_DIR "/config.json");
         auto it = cfg.apps.find(process);
         if (it == cfg.apps.end()) {
-            // Not configured: unload ourselves — zero trace in this process.
+            it = cfg.apps.find("*");
+            if (it != cfg.apps.end()) {
+                // Safety guard: never spoof critical system processes in global mode
+                if (process == "system_server" ||
+                    process == "com.android.systemui" ||
+                    process == "com.android.phone" ||
+                    process == "com.google.android.gms" ||
+                    process == "com.google.android.gms.unstable" ||
+                    process.rfind("com.android.providers.", 0) == 0) {
+                    api_->setOption(zygisk::Option::DLCLOSE_MODULE_LIBRARY);
+                    return;
+                }
+            }
+        }
+        if (it == cfg.apps.end() || it->second.empty() || it->second == "none") {
+            // Not configured or explicitly excluded: unload ourselves — zero trace.
             api_->setOption(zygisk::Option::DLCLOSE_MODULE_LIBRARY);
             return;
         }

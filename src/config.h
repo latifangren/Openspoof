@@ -224,6 +224,24 @@ private:
         out = s_.substr(start, pos_ - start);
         return true;
     }
+    // Match the leading word and verify a hard boundary so "truev"
+    // does not match "true". Used for the JSON literals true, false,
+    // and null. The caller can decide whether to treat null as an
+    // empty string or to keep it as the literal "null".
+    bool parseKeyword(const char* kw, std::string& out) {
+        size_t n = std::strlen(kw);
+        if (s_.compare(pos_, n, kw) != 0) return false;
+        // Boundary: next char must be whitespace, comma, brace, bracket, or end.
+        char next = (pos_ + n < s_.size()) ? s_[pos_ + n] : '\0';
+        if (next != '\0' && !std::isspace((unsigned char)next) && next != ',' &&
+            next != '}' && next != ']') {
+            return false;
+        }
+        out = kw;
+        pos_ += n;
+        return true;
+    }
+
     bool parseValue(Value& out) {
         skipWs();
         if (pos_ >= s_.size()) return false;
@@ -231,6 +249,20 @@ private:
         std::string lit;
         if (s_[pos_] == '"') {
             if (!parseString(lit)) return false;
+        } else if (s_.compare(pos_, 4, "true") == 0 ||
+                   s_.compare(pos_, 5, "false") == 0) {
+            // JSON boolean. We store the literal text in .str so
+            // downstream code that compares with v == "true" / "1"
+            // keeps working. (Caller can also check the raw string.)
+            if (!parseKeyword(s_[pos_] == 't' ? "true" : "false", lit)) {
+                return false;
+            }
+        } else if (s_.compare(pos_, 4, "null") == 0) {
+            if (!parseKeyword("null", lit)) return false;
+            // null is represented as an empty string for our
+            // purposes. A future schema that needs the distinction
+            // can add a Value::isNull bit here.
+            lit.clear();
         } else {
             if (!parseNumber(lit)) return false;
         }

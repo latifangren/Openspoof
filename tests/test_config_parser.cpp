@@ -68,6 +68,17 @@ static Config loadFromString(const std::string& s) {
             if (!kv.second.isObject) cfg.apps[kv.first] = kv.second.str;
         }
     }
+    // version_policy: replicate the production parser so the tests
+    // exercise the same code path that src/spoof.cpp uses. unknown
+    // values fall back to Rom.
+    auto vit = root.object.find("version_policy");
+    if (vit != root.object.end() && !vit->second.isObject) {
+        std::string v = vit->second.str;
+        for (auto& c : v) c = (char)std::tolower((unsigned char)c);
+        if      (v == "never") cfg.versionPolicy = VersionPolicy::Never;
+        else if (v == "force") cfg.versionPolicy = VersionPolicy::Force;
+        else                    cfg.versionPolicy = VersionPolicy::Rom;
+    }
     return cfg;
 }
 

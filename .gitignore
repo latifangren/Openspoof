@@ -1,0 +1,15 @@
+# Temporary & Scratch
+.tmp/
+
+# Build Outputs & Packaging
+openspoof-*.zip
+module/zygisk/
+src/zygisk.hpp
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+*.swp
+*.bak
+.vscode/
+.idea/

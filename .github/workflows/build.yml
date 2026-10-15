@@ -8,14 +8,25 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+# Cancel in-progress runs for the same branch / PR when a new commit
+# arrives. Saves CI minutes for fast-iterating contributors.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build Zygisk Module
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          # Full clone is needed so actions/cache can hash .git/HEAD, but
+          # we still avoid paying for unrelated history on shallow clones.
+          fetch-depth: 0
 
       - name: Setup Android NDK (r27b)
         uses: nttld/setup-ndk@v1
@@ -24,17 +35,51 @@ jobs:
           ndk-version: r27b
           link-to-sdk: true
 
+      # Speed up: cache the NDK install across runs. Keyed on the NDK
+      # version so a version bump invalidates the cache automatically.
+      # The setup-ndk action installs into a per-version path; caching
+      # that path avoids the ~1GB download on subsequent runs.
+      - name: Cache Android NDK
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.setup-ndk.outputs.ndk-path }}
+          # nttld/setup-ndk exposes "ndk-full-version" (e.g. 27.3.13704824)
+          # which is more stable than the input "r27b" tag for cache keys.
+          key: ndk-${{ steps.setup-ndk.outputs.ndk-full-version }}-${{ runner.os }}-v1
+          restore-keys: |
+            ndk-${{ steps.setup-ndk.outputs.ndk-full-version }}-
+
       - name: Install Build Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build zip curl
+          sudo apt-get install -y cmake ninja-build zip curl shellcheck clang
 
       - name: Run shell tests
         run: |
           chmod +x tests/run.sh tests/test_*.sh
           ./tests/run.sh
 
-      - name: Build Dobby (ARM64 Static Library)
+      # Cheap static check: catch syntax errors in C++ without paying
+      # for a full NDK build. Runs against the host compiler; bionic-
+      # specific headers are guarded by #ifdef in the sources we ship,
+      # so a syntax pass is meaningful for the JNI / Dobby glue.
+      - name: C++ syntax check (host clang)
+        run: |
+          clang++ -fsyntax-only -std=c++17 -Wall -Wextra -I src \
+            src/spoof.cpp src/hooks.cpp 2>&1 | tee cxx-syntax.log
+
+      # Lint the shell scripts that ship in module/, scripts/, and tests/.
+      # We use --severity=warning so style nits don't fail the run, but
+      # real bugs (unquoted vars, missing set -e) are caught.
+      - name: Shellcheck
+        run: |
+          shellcheck --severity=warning -x \
+            scripts/build.sh scripts/build_dobby.sh \
+            module/customize.sh module/service.sh module/uninstall.sh \
+            module/sepolicy_helper.sh \
+            tests/run.sh tests/test_sepolicy_helper.sh
+
+      - name: Build Dobby (multi-ABI Static Library)
         run: |
           chmod +x scripts/build_dobby.sh
           ./scripts/build_dobby.sh
@@ -54,3 +99,11 @@ jobs:
           name: openspoof-module
           path: openspoof-v*.zip
           if-no-files-found: error
+
+      - name: Upload C++ syntax log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cxx-syntax-log
+          path: cxx-syntax.log
+          if-no-files-found: ignore

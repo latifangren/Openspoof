@@ -1,0 +1,111 @@
+name: Release OpenSpoof
+
+# Cut a GitHub Release whenever a tag matching v* is pushed. The actual
+# build is done by build.yml on the same tag push; this workflow just
+# waits for the artifact, downloads it, and publishes the Release with
+# notes extracted from docs/CHANGELOG.md.
+#
+# This file intentionally does NOT rebuild: that would duplicate work
+# and risk version skew between the build artifact and the Release.
+
+on:
+  push:
+    tags: [ "v*" ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.3.0). Must already exist."
+        required: true
+        type: string
+
+permissions:
+  contents: write   # needed to create the GitHub Release
+
+jobs:
+  release:
+    name: Publish Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Resolve tag
+        id: tag
+        run: |
+          # When triggered by tag push, GITHUB_REF_NAME is the tag.
+          # When triggered manually, prefer the user input.
+          if [ -n "${{ inputs.tag }}" ]; then
+            echo "name=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+          # The version is the tag with the leading 'v' stripped.
+          version="${TAG_NAME#v}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: openspoof-module
+          path: dist/
+        # The build workflow publishes the artifact for the same tag push,
+        # so it should already exist. If a contributor pushed a tag without
+        # going through build.yml first, the run fails fast here.
+      - name: List downloaded artifacts
+        run: ls -la dist/
+
+      # Pull the notes for this version from docs/CHANGELOG.md. We extract
+      # everything between the first occurrence of "## [vX.Y.Z]" (or the
+      # "## [Unreleased]" header for the leading-edge release) and the
+      # next "## [" header. If the file doesn't have the section we fall
+      # back to a generic message so the release is still created.
+      - name: Extract release notes
+        id: notes
+        run: |
+          set -e
+          version="${{ steps.tag.outputs.version }}"
+          changelog="docs/CHANGELOG.md"
+          if [ ! -f "$changelog" ]; then
+            echo "OpenSpoof ${version}" > release-notes.md
+            exit 0
+          fi
+          # Try the exact version first, then "Unreleased" as a fallback.
+          if grep -q "## \[v${version}\]" "$changelog"; then
+            pattern="## \[v${version}\]"
+          else
+            pattern="## \[Unreleased\]"
+          fi
+          notes="$(awk -v p="$pattern" '
+            $0 ~ p {flag=1; next}
+            /^## \[/ {flag=0}
+            flag {print}
+          ' "$changelog")"
+          if [ -z "$notes" ]; then
+            notes="OpenSpoof ${version}. See docs/CHANGELOG.md for details."
+          fi
+          printf '%s\n' "$notes" > release-notes.md
+
+      - name: Show extracted notes
+        if: always()
+        run: |
+          echo "----- release-notes.md -----"
+          cat release-notes.md
+          echo "----- end -----"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          name: "OpenSpoof ${{ steps.tag.outputs.version }}"
+          body_path: release-notes.md
+          # Upload every file we found under dist/. There should be exactly
+          # one flashable zip, but using a glob keeps the workflow forgiving
+          # if the build script ever produces a checksum file too.
+          files: dist/*
+          fail_on_unmatched_files: true
+          draft: false
+          prerelease: ${{ contains(steps.tag.outputs.name, '-') }}

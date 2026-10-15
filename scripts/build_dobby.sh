@@ -1,6 +1,10 @@
 #!/bin/bash
-# OpenSpoof — Dobby ARM64 Builder
-# Compiles static libdobby.a for arm64-v8a (Android 64-bit target)
+# OpenSpoof — Dobby multi-ABI Builder
+# Compiles static libdobby.a for every ABI OpenSpoof ships (arm64-v8a,
+# armeabi-v7a, x86_64). All three are needed because scripts/build.sh
+# links the per-ABI .so against the matching libdobby.a — building only
+# arm64-v8a (as in earlier versions) made the other two ABIs fail to link
+# at packaging time.
 # Usage: ./scripts/build_dobby.sh
 set -euo pipefail
 
@@ -10,7 +14,7 @@ cd "$REPO"
 ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-}}"
 : "${ANDROID_NDK_HOME:?set ANDROID_NDK_HOME or ANDROID_NDK_ROOT to your NDK path}"
 
-ABIS=("arm64-v8a")
+ABIS=("arm64-v8a" "armeabi-v7a" "x86_64")
 
 GEN_ARG=""
 if command -v ninja >/dev/null 2>&1; then

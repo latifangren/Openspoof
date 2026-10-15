@@ -25,8 +25,12 @@ set -u
 
 # logging helper: writes to logcat tag "OpenSpoof".
 log_se() {
-  log -t OpenSpoof "sepolicy: $1" 2>/dev/null || \
-    echo "OpenSpoof sepolicy: $1" >/dev/kmsg 2>&1 || true
+  # On Android, `log -t` writes to logcat. On other systems (test sandboxes,
+  # CI) it does not exist, and /dev/kmsg may be unwritable — sending the
+  # fallback there floods stderr. We deliberately drop the message in that
+  # case: the test harness reads state via the rule-application return code
+  # and tool invocations, not via this log line.
+  log -t OpenSpoof "sepolicy: $1" 2>/dev/null || true
 }
 
 # Returns 0 if the named tool is callable from $PATH or a known absolute path.

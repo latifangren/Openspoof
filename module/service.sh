@@ -5,6 +5,18 @@ CONFIG=$MODDIR/config.json
 BACKUP=$MODDIR/config.backup.json
 TEMPLATE=$MODDIR/config.default.json
 DISABLE=$MODDIR/.disable_openspoof
+SEPOLICY_HELPER=$MODDIR/sepolicy_helper.sh
+
+# 0. Runtime SELinux policy for Phase 4 (Dobby inline hooks).
+# Best-effort: silently no-ops if the helper is missing or no policy
+# tool is on PATH. Phase 1–2 work fine without this.
+if [ -f "$SEPOLICY_HELPER" ]; then
+  if [ -r "$SEPOLICY_HELPER" ]; then
+    . "$SEPOLICY_HELPER" || log -t OpenSpoof "sepolicy_helper exited non-zero"
+  else
+    log -t OpenSpoof "sepolicy_helper not readable, skipping"
+  fi
+fi
 
 # 1. Emergency disable sentinel
 if [ -f "$DISABLE" ]; then

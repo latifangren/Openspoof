@@ -1,4 +1,4 @@
-// OpenSpoof — minimal per-app device/CPU spoofer (Zygisk module).
+// OpenSpoof — per-app device/CPU/identity spoofer (Zygisk module).
 //
 // Phase 1: android.os.Build static fields via JNI in preAppSpecialize.
 //          No inline-hook engine needed — Build fields are public statics.
@@ -6,6 +6,8 @@
 //          preAppSpecialize runs while the process is still root.
 // Phase 4: Native hooks via Dobby (__system_property_get, uname, uptime, GPU).
 // Phase B: Hardware Identifiers (Android ID, Telephony GSM properties, MAC address).
+// Phase C: DRM (MediaDrm.getPropertyString via RegisterNatives) and Geolocation
+//          hooks (cell LAC/CID, GPS via config in Phase D).
 //
 // Build with the NDK: see scripts/build.sh
 // zygisk.hpp is fetched at build time from topjohnwu/zygisk-module-sample.

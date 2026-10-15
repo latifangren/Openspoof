@@ -1,104 +1,141 @@
-# Fase 4 — Native Hooks (Dobby)
+# Phase 4 — Native hooks (Dobby)
 
-**Status implementasi (2026-10-15):** selesai dikerjakan sejauh bisa tanpa NDK/device.
-Dobby di-vendor di `third_party/dobby` (shallow clone); `src/hooks.cpp` lolos
-compile-check lawan **header Dobby asli**; WebUI punya editor `native_hooks`
-dengan risk gate ("use at your own risk"); contoh config terisi. Sisa: build
-`libdobby.a` via CMake+NDK di mesin build, lalu uji di device root (§7).
+**Implementation status (v0.2.0):** code complete to the extent
+possible without an NDK-equipped build host and a physical device.
+Dobby is vendored at `third_party/dobby`; `src/hooks.cpp` is
+syntax-checked against the original Dobby header; the WebUI exposes
+a `native_hooks` editor with a risk gate. Remaining: build
+`libdobby.a` via CMake + NDK, then run the device checklist in
+[ROADMAP.md](ROADMAP.md) § 5.
 
-**Tujuan:** membuka fitur sekelas PRO COPG yang bekerja di **lapisan native**
-(tanpa Java method hooking) — dengan satu integrasi hook engine.
+**Goal:** enable the COPG-PRO-equivalent feature set on the **native
+layer** (no Java method hooking) with a single hook engine
+integration.
 
-## 1. Pilihan engine: Dobby
+For the contract, non-goals, and where this fits in the overall
+phases, see [SPEC.md](SPEC.md). For the per-phase status of F1–F4
+and PRO, see [ROADMAP.md](ROADMAP.md).
 
-- **Dobby** — https://github.com/jmpews/Dobby — inline-hook framework
-  multi-arch (ARM/ARM64/x86_64), dipakai luas di modul Zygisk/game-modding,
-  API stabil: `DobbyHook(addr, replace, &orig)`.
-- Alternatif yang dipertimbangkan: ShadowHook (ByteDance, optimasi Android),
-  v7878 (dipakai COPG — URL repo tidak terverifikasi, jadi tidak dipilih).
-- Dobby dialokasikan sebagai **static lib** (`libdobby.a`) dan di-link ke
-  `zygisk/*.so` — tidak ada `.so` tambahan yang terlihat di `maps`.
+## 1. Engine choice: Dobby
 
-## 2. Cakupan Fase 4
+- **Dobby** — <https://github.com/jmpews/Dobby> — multi-arch
+  inline-hook framework (ARM / ARM64 / x86_64), widely used in
+  Zygisk modules and game modding, stable API:
+  `DobbyHook(addr, replace, &orig)`.
+- Considered alternatives: ShadowHook (ByteDance, Android-optimized),
+  v7878 (used by COPG — repo URL unverified, rejected).
+- Dobby is linked as a **static lib** (`libdobby.a`) into
+  `zygisk/*.so` — no extra `.so` shows up in `maps`.
 
-| ID | Fitur | Teknik | Tingkat |
-|---|---|---|---|
-| F4a | **Fake uptime** per-app | Hook `clock_gettime`; geser `CLOCK_BOOTTIME`/`CLOCK_MONOTONIC` sebesar `uptime_offset_sec` | mudah |
-| F4b | **uname spoof** per-app | Hook `uname()`; timpa `machine`/`sysname` | mudah |
-| F4c | **Native prop spoof** per-app | Hook `__system_property_get`; kembalikan nilai config untuk key terdaftar, teruskan sisanya ke fungsi asli | sedang |
-| F4d | **getprop consistency** | *Gratis dari F4c:* anak proses (`Runtime.exec("getprop")`) adalah fork dari proses aplikasi → mewarisi memori yang sudah di-hook → `getprop` baca nilai spoof yang sama | — (verifikasi) |
+## 2. Coverage
 
-**Eksplisit bukan Fase 4** (butuh ART/Java method hooking — direncanakan Fase 5):
-Android ID, IMEI/TelephonyManager, WebView UA, sensor list, GPS/Fused, SIM.
-Pilihan Fase 5: integrasi Pine/LSPlant-style ART hook, atau modul pendamping LSPosed.
+| ID    | Feature                                       | Technique                                                    |
+|-------|-----------------------------------------------|--------------------------------------------------------------|
+| F4a   | Per-app fake uptime                           | Hook `clock_gettime`; shift `CLOCK_BOOTTIME` / `CLOCK_MONOTONIC` by `uptime_offset_sec`. |
+| F4b   | Per-app `uname` spoof                         | Hook `uname()`; overwrite `machine` / `sysname`.             |
+| F4c   | Per-app native property spoof                 | Hook `__system_property_get`; return config value for registered keys, forward the rest. |
+| F4d   | `getprop` consistency                         | Free from F4c: child processes (`Runtime.exec("getprop")`) are forks of the app process, so they inherit the hooked memory. |
+| F4e   | GPU spoof (OpenGL ES / EGL)                   | Hook `glGetString`, `eglQueryString`, `eglGetProcAddress`.   |
+| F4f   | Vulkan physical-device properties             | Hook `vkGetPhysicalDeviceProperties`; patch `deviceName` and `vendorID` at the spec-defined offsets. |
 
-## 3. Arsitektur
+**Explicitly NOT in Phase 4** (needs ART / Java method hooking —
+planned for Phase 5): Android ID, IMEI / TelephonyManager, WebView
+UA, sensor list, GPS / Fused, SIM. Some of these are partially
+covered by Phase B/C via `__system_property_get` and direct JNI;
+see [ROADMAP.md](ROADMAP.md) for the per-phase status.
+
+## 3. Architecture
 
 ```
-preAppSpecialize (masih root, sebelum kode aplikasi)
-  └─ paket cocok? ── ya ──▶ InstallNativeHooks(profile.nativeHooks)
-                               ├─ clock_gettime → fake_clock_gettime   (F4a)
-                               ├─ uname         → fake_uname           (F4b)
-                               └─ __system_property_get → fake_...    (F4c)
-                            tidak ──▶ no-op (tanpa Dobby pun aman)
+preAppSpecialize (still root, before app code)
+  └─ package match? ── yes ──▶ InstallNativeHooks(profile.nativeHooks)
+                               ├─ clock_gettime             → fake_clock_gettime     (F4a)
+                               ├─ uname                     → fake_uname             (F4b)
+                               ├─ __system_property_get     → fake_property_get      (F4c)
+                               ├─ __system_property_read_callback → fake_read_callback (F4c, modern Android)
+                               ├─ ioctl (SIOCGIFHWADDR)     → fake_ioctl             (Phase B)
+                               ├─ glGetString               → fake_glGetString       (F4e)
+                               ├─ eglQueryString            → fake_eglQueryString    (F4e)
+                               ├─ eglGetProcAddress         → fake_eglGetProcAddress (F4e)
+                               ├─ vkGetPhysicalDeviceProperties → fake_vk_…           (F4f)
+                               └─ vkGetInstanceProcAddr     → fake_vk_instance…      (F4f)
+                            no ──▶ no-op (safe even without Dobby)
 ```
 
-- **Per-app gating:** hook hanya dipasang untuk paket yang terdaftar di config.
-  Paket lain → `DLCLOSE_MODULE_LIBRARY` seperti Fase 1 (zero trace).
-- **Tanpa Dobby:** `InstallNativeHooks()` jadi no-op + log — build tetap jalan,
-  fitur Fase 1–3 tidak terpengaruh.
-- **F4c hot path:** `__system_property_get` dipanggil sangat sering; implementasi
-  hanya `map.find(name)` dan langsung teruskan ke fungsi asli bila tidak cocok.
-  Key yang di-spoof sebaiknya sedikit (daftar di config).
+- **Per-app gating:** hooks are installed only for packages listed
+  in `config.json`. Other packages → `DLCLOSE_MODULE_LIBRARY`,
+  same as Phase 1 (zero trace).
+- **Without Dobby:** `InstallNativeHooks()` is a no-op + log. The
+  build still succeeds; Phase 1–3 features are unaffected.
+- **F4c hot path:** `__system_property_get` is called very often.
+  The implementation does a single `map.find(name)` and forwards
+  to the original on miss. Keep the spoofed key list small.
 
 ## 4. SELinux
 
-Inline hook butuh halaman anonim RWX (trampolin Dobby) dan `mprotect` di `.text`.
-Template di `module/sepolicy.rule` (dari pola COPG):
+Inline hooks need anonymous RWX pages (Dobby trampolines) and
+`mprotect` on `.text`. The template in `module/sepolicy.rule`
+(following the COPG pattern) is:
 
 ```
 allow untrusted_app untrusted_app process execmem
 ```
 
-Ini **template** — validasi di device: `adb shell dmesg | grep avc` setelah
-menjalankan aplikasi target, lalu ketatkan domain sesuai ROM. Tanpa rule yang
-benar, `DobbyHook` gagal diam-diam (di-log, bukan crash).
+This is a **template** — validate on your device by running
+`adb shell dmesg | grep 'avc:' | grep denied` after launching a
+configured app, then tighten the domain to what your ROM actually
+reports. Without a working rule, `DobbyHook` fails gracefully
+(logged, not fatal). On Android 11+ with strict enforcing, you may
+also need a broader `appdomain` allowance or apply it at boot via
+`magiskpolicy --live` from `module/service.sh`.
 
-## 5. Skema config
+## 5. Config schema
 
 ```json
 "native_hooks": {
   "uptime_offset_sec": 172800,
   "uname": { "machine": "aarch64", "sysname": "Linux" },
-  "props": { "ro.product.model": "NX769J", "ro.product.brand": "nubia" }
+  "props": { "ro.product.model": "NX769J", "ro.product.brand": "nubia" },
+  "gpu": { "vendor": "Qualcomm", "renderer": "Adreno (TM) 750" },
+  "id": { "android_id": "...", "mac_address": "...", "gaid": "..." },
+  "telephony": { "imei": "...", "sim_operator": "310260" },
+  "drm": { "security_level": "L1" },
+  "location": { "latitude": "37.7749", "longitude": "-122.4194" }
 }
 ```
 
-Semua field opsional; objek boleh kosong/absen → hook terkait tidak dipasang.
+Every field is optional; an empty or absent object → no related
+hook is installed.
 
 ## 6. Build & vendoring
 
 ```bash
 git clone https://github.com/jmpews/Dobby third_party/dobby
-# build Dobby sesuai docs-nya (CMake + NDK) hingga menghasilkan libdobby.a
-./scripts/build.sh   # otomatis -DHAVE_DOBBY bila third_party/dobby/include ada
+# build Dobby per its docs (CMake + NDK) to produce libdobby.a
+./scripts/build.sh   # auto-adds -DHAVE_DOBBY when third_party/dobby/include exists
 ```
 
-## 7. Testing (device root)
+`zygisk.hpp` is fetched at build time from
+`topjohnwu/zygisk-module-sample` (canonical, Magisk guarantees
+backward compat).
+
+## 7. Testing (rooted device)
 
 1. `adb logcat -s OpenSpoof` → `hooked clock_gettime/uname/__system_property_get`.
-2. F4a: aplikasi target baca uptime (mis. `SystemClock.elapsedRealtime()`)
-   bergeser sebesar offset; aplikasi lain normal.
-3. F4c: di aplikasi target, baca prop via `__system_property_get`
-   (NdkMedia atau test app) = nilai config.
-4. F4d: dari aplikasi target, `Runtime.exec("getprop ro.product.model")`
-   → nilai spoof (bukan nilai asli).
-5. `adb shell dmesg | grep avc` → tidak ada denial terkait hook.
+2. F4a: the target app reads uptime (e.g. `SystemClock.elapsedRealtime()`)
+   shifted by the offset; other apps read normal values.
+3. F4c: in the target app, reading a prop via
+   `__system_property_get` (NdkMedia or a small test app) returns
+   the configured value.
+4. F4d: from the target app, `Runtime.exec("getprop ro.product.model")`
+   returns the spoofed value (not the real one).
+5. `adb shell dmesg | grep avc` → no denial related to the hook.
 
-## 8. Risiko — dibaca dulu
+## 8. Risks — read first
 
-Inline hook meninggalkan artefak yang **bisa dideteksi**: prolog fungsi yang
-dimodifikasi, trampolin RWX anonim, `mprotect` di `.text`. Ini menaikkan profil
-deteksi dibanding Fase 1 (yang zero-trace untuk paket tak terdaftar).
-Ikuti pola COPG: tandai fitur Fase 4 sebagai **resident / use-at-your-own-risk**,
-jangan dipakai untuk game dengan anti-cheat kompetitif.
+Inline hooks leave artefacts that **can be detected**: modified
+function prologues, anonymous RWX trampolines, `mprotect` on
+`.text`. This raises the detection profile vs. Phase 1 (which is
+zero-trace for unconfigured packages). Following the COPG pattern,
+treat Phase 4 features as **resident / use-at-your-own-risk**, and
+do not enable them for games with competitive anti-cheat.

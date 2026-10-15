@@ -51,14 +51,19 @@ get_dobby_lib() { # $1 abi
 }
 
 build_abi() { # $1 triple-prefix, $2 zygisk dir name
-  local ext=""
-  [ "$HOST_TAG" = "windows-x86_64" ] && ext=".cmd"
-  local cxx="$TOOL/$1-linux-android$API-clang++$ext"
-  [ "$1" = "armv7a" ] && cxx="$TOOL/armv7a-linux-androideabi$API-clang++$ext"
-  local strip="$TOOL/llvm-strip"
-  [ "$HOST_TAG" = "windows-x86_64" ] && strip="$TOOL/llvm-strip.exe"
+  # Windows NDK ships cross-compilers as .exe (e.g. aarch64-linux-android21-clang++.exe).
+  # Native (Linux/macOS) NDK has no extension. There is no `.cmd` shim for cross targets.
+  local exe=""
+  if [ "$HOST_TAG" = "windows-x86_64" ]; then exe=".exe"; fi
+  local cxx="$TOOL/$1-linux-android$API-clang++$exe"
+  if [ "$1" = "armv7a" ]; then cxx="$TOOL/armv7a-linux-androideabi$API-clang++$exe"; fi
+  local strip="$TOOL/llvm-strip$exe"
 
   local dobby_lib="$(get_dobby_lib "$2")"
+
+  if [ ! -x "$cxx" ] && [ ! -f "$cxx" ]; then
+    echo "compiler not found: $cxx"; return 1
+  fi
 
   echo "building $2 (dobby: ${dobby_lib:-none})..."
   mkdir -p module/zygisk

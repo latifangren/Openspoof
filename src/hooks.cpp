@@ -176,11 +176,10 @@ const unsigned char* fake_glGetString(unsigned int name) {
 }
 
 const char* fake_eglQueryString(void* dpy, int name) {
-    if (name == EGL_VENDOR && !g_egl_vendor.empty()) {
-        return g_egl_vendor.c_str();
-    }
-    if (name == EGL_VENDOR && !g_gpu_vendor.empty()) {
-        return g_gpu_vendor.c_str();
+    // EGL_VENDOR: prefer egl_vendor (explicit override), else fall back to gpu_vendor.
+    if (name == EGL_VENDOR) {
+        if (!g_egl_vendor.empty())  return g_egl_vendor.c_str();
+        if (!g_gpu_vendor.empty())  return g_gpu_vendor.c_str();
     }
     if (name == EGL_VERSION && !g_egl_version.empty()) {
         return g_egl_version.c_str();
@@ -204,15 +203,26 @@ void* fake_eglGetProcAddress(const char* procname) {
 }
 
 // --- F4f: Vulkan Physical Device Properties (PRO Tier) ------------------------
-struct FakeVkPhysicalDeviceProperties {
-    uint32_t apiVersion;
-    uint32_t driverVersion;
-    uint32_t vendorID;
-    uint32_t deviceID;
-    uint32_t deviceType;
-    char deviceName[256];
-    uint8_t pipelineCacheUUID[16];
-};
+// Field offsets per Vulkan spec (1.0+): apiVersion=0, driverVersion=4,
+// vendorID=8, deviceID=12, deviceType=16, deviceName=20 (VK_MAX_PHYSICAL_DEVICE_NAME_SIZE=256),
+// pipelineCacheUUID=276. We prefer the NDK header when available, but fall back
+// to the spec constants so the field offsets are correct even on host-side
+// sanity builds that lack <vulkan/vulkan.h>.
+#if defined(__has_include)
+#  if __has_include(<vulkan/vulkan.h>)
+#    include <vulkan/vulkan.h>
+#    define OPENSPOOF_HAS_VULKAN_H 1
+#  endif
+#endif
+
+#ifndef VK_MAX_PHYSICAL_DEVICE_NAME_SIZE
+#  define VK_MAX_PHYSICAL_DEVICE_NAME_SIZE 256
+#endif
+// Spec-defined layout offsets (bytes).
+#define OPENSPOOF_VK_OFFSET_VENDOR_ID  8u
+#define OPENSPOOF_VK_OFFSET_DEVICE_NAME 20u
+#define OPENSPOOF_VK_PCI_QUALCOMM 0x5143u
+#define OPENSPOOF_VK_PCI_ARM      0x13B5u
 
 static void (*orig_vkGetPhysicalDeviceProperties)(void*, void*) = nullptr;
 
@@ -220,16 +230,26 @@ void fake_vkGetPhysicalDeviceProperties(void* physicalDevice, void* pProperties)
     if (orig_vkGetPhysicalDeviceProperties != nullptr) {
         orig_vkGetPhysicalDeviceProperties(physicalDevice, pProperties);
     }
-    if (pProperties != nullptr && !g_gpu_renderer.empty()) {
-        auto* props = reinterpret_cast<FakeVkPhysicalDeviceProperties*>(pProperties);
-        strncpy(props->deviceName, g_gpu_renderer.c_str(), sizeof(props->deviceName) - 1);
-        props->deviceName[sizeof(props->deviceName) - 1] = '\0';
-        if (!g_gpu_vendor.empty()) {
-            if (g_gpu_vendor.find("Qualcomm") != std::string::npos) {
-                props->vendorID = 0x5143; // Qualcomm PCI vendor ID
-            } else if (g_gpu_vendor.find("ARM") != std::string::npos) {
-                props->vendorID = 0x13B5; // ARM PCI vendor ID
-            }
+    if (pProperties == nullptr || g_gpu_renderer.empty()) return;
+
+    // Write deviceName at the spec-defined offset. This is safe regardless of
+    // which Vulkan version's struct the real driver allocated: deviceName has
+    // been at offset 20 since VkPhysicalDeviceProperties 1.0.
+    char* nameDst = reinterpret_cast<char*>(pProperties) + OPENSPOOF_VK_OFFSET_DEVICE_NAME;
+    strncpy(nameDst, g_gpu_renderer.c_str(), VK_MAX_PHYSICAL_DEVICE_NAME_SIZE - 1);
+    nameDst[VK_MAX_PHYSICAL_DEVICE_NAME_SIZE - 1] = '\0';
+
+    if (!g_gpu_vendor.empty()) {
+        uint32_t vid = 0;
+        if (g_gpu_vendor.find("Qualcomm") != std::string::npos) {
+            vid = OPENSPOOF_VK_PCI_QUALCOMM;
+        } else if (g_gpu_vendor.find("ARM") != std::string::npos) {
+            vid = OPENSPOOF_VK_PCI_ARM;
+        }
+        if (vid != 0) {
+            uint32_t* vidDst = reinterpret_cast<uint32_t*>(
+                reinterpret_cast<char*>(pProperties) + OPENSPOOF_VK_OFFSET_VENDOR_ID);
+            *vidDst = vid;
         }
     }
 }

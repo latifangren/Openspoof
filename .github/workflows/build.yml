@@ -29,6 +29,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build zip curl
 
+      - name: Run shell tests
+        run: |
+          chmod +x tests/run.sh tests/test_*.sh
+          ./tests/run.sh
+
       - name: Build Dobby (ARM64 Static Library)
         run: |
           chmod +x scripts/build_dobby.sh

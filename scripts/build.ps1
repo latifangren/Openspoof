@@ -100,7 +100,7 @@ foreach ($Abi in $Abis) {
     & $Compiler `
         -std=c++17 -shared -fPIC -O2 -ffunction-sections -fdata-sections "-Wl,--gc-sections" `
         -DHAVE_DOBBY -I src -I third_party/dobby/include `
-        src/spoof.cpp src/hooks.cpp `
+        src/spoof.cpp src/hooks.cpp src/f5_art_hooks.cpp `
         $DobbyLib -llog `
         -o $OutSo
         

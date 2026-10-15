@@ -247,6 +247,8 @@ public:
         }
         androidId_ = p->nativeHooks.id.androidId;
         drm_ = p->nativeHooks.drm;
+        disableFlagSecure_ = p->nativeHooks.disableFlagSecure;
+        languageTag_ = p->nativeHooks.languageTag;
 
         spoofCpuinfo(it->second);  // Phase 2 (no-op when no cpuinfo file for profile)
         spoofBuild(env_, *p);      // Phase 1
@@ -263,6 +265,17 @@ public:
         if (drm_.enabled()) {
             installMediaDrmHook(env_, drm_);  // Phase C (post-init attempt)
         }
+        // Phase 5: ART-side hooks run after the app's classes are
+        // loaded. FLAG_SECURE is the most reliable here because
+        // android.view.Window is a system class that Zygote has
+        // already resolved by postAppSpecialize. Locale is
+        // similar: java.util.Locale is in the bootclasspath.
+        if (disableFlagSecure_) {
+            openspoof::InstallFlagSecureHookF5(env_);
+        }
+        if (!languageTag_.empty()) {
+            openspoof::ApplyLocaleOverrideF5(env_, languageTag_);
+        }
     }
 
 private:
@@ -270,6 +283,8 @@ private:
     JNIEnv* env_ = nullptr;
     std::string androidId_;
     DrmConfig drm_;
+    bool disableFlagSecure_ = false;
+    std::string languageTag_;
 };
 
 REGISTER_ZYGISK_MODULE(OpenSpoof)

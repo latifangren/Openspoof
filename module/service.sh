@@ -12,6 +12,7 @@ SEPOLICY_HELPER=$MODDIR/sepolicy_helper.sh
 # tool is on PATH. Phase 1–2 work fine without this.
 if [ -f "$SEPOLICY_HELPER" ]; then
   if [ -r "$SEPOLICY_HELPER" ]; then
+    # shellcheck source=/dev/null
     . "$SEPOLICY_HELPER" || log -t OpenSpoof "sepolicy_helper exited non-zero"
   else
     log -t OpenSpoof "sepolicy_helper not readable, skipping"
@@ -35,6 +36,7 @@ fi
 
 # 3. Simple JSON sanity validation
 is_valid_json() {
+  # shellcheck disable=SC3043
   local file="$1"
   [ -s "$file" ] || return 1
   # Check basic braces balance and mandatory keys

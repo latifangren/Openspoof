@@ -86,6 +86,7 @@ run_helper() {
     # log output is silenced on non-Android (no `log -t`), so it goes
     # nowhere useful — assertions below read STUB_LOG instead.
     export STUB_LOG
+    # shellcheck source=/dev/null
     . "$HELPER" >/dev/null 2>&1
   )
   return $?

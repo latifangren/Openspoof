@@ -59,7 +59,8 @@ build_abi() { # $1 triple-prefix, $2 zygisk dir name
   if [ "$1" = "armv7a" ]; then cxx="$TOOL/armv7a-linux-androideabi$API-clang++$exe"; fi
   local strip="$TOOL/llvm-strip$exe"
 
-  local dobby_lib="$(get_dobby_lib "$2")"
+  local dobby_lib
+  dobby_lib="$(get_dobby_lib "$2")"
   local abi_dobby_flags=""
   if [ -n "$dobby_lib" ]; then
     abi_dobby_flags="$DOBBY_FLAGS"

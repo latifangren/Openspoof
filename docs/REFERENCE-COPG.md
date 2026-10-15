@@ -182,6 +182,51 @@ Concrete ideas this audit suggests, listed in rough order of effort:
 5. **License server is the missing piece COPG has and OpenSpoof
    deliberately does not.** This is by design and not a gap.
 
+## Adoption from COPG-VD v5.2.1 (Apache-2.0)
+
+Unlike the COPG v7.5.1 audit above, COPG-VD v5.2.1 is licensed
+**Apache License 2.0** and ships its **source code in the public
+repository** (no proprietary DEX payload, no license server).
+That makes direct adoption possible and intended: the maintainer
+can copy design and code fragments with attribution.
+
+What was adopted (and where it lives in OpenSpoof):
+
+| Design | Source | OpenSpoof file | Notes |
+|---|---|---|---|
+| `VersionPolicy { Never, Rom, Force }` enum + clamp logic | [spoof_module.cpp:29-105](https://github.com/VD171/COPG-VD/blob/main/zygisk/spoof_module.cpp) | [src/config.h](src/config.h) `VersionPolicy`, [src/spoof.cpp](src/spoof.cpp) `versionAllowed()` | The guard against raising `SDK_INT` above the ROM's true level — without this, a config typo can softloop the device. |
+| 17-field Build coverage (BRAND..SERIAL plus BOOTLOADER, HOST, ODM_SKU, SKU, TAGS, TYPE, USER) + Build.TIME (long) | [spoof_module.cpp:130-180](https://github.com/VD171/COPG-VD/blob/main/zygisk/spoof_module.cpp) | [src/spoof.cpp](src/spoof.cpp) `spoofBuild()` | The original OpenSpoof only set 11 of 17 Build fields. The added six close a real detection vector. |
+| `releaseOrCodename` AOSP rule (RELEASE_OR_CODENAME = "REL" == CODENAME ? RELEASE : CODENAME) | [spoof_module.cpp:107-112](https://github.com/VD171/COPG-VD/blob/main/zygisk/spoof_module.cpp) | [src/spoof.cpp](src/spoof.cpp) `releaseOrCodename()` | Prevents a fingerprint that publishes "REL" in the version slot, which no real device reports. |
+| Defensive `getFieldOrNull` pattern (clear exception on missing field) | [spoof_module.cpp:130-134](https://github.com/VD171/COPG-VD/blob/main/zygisk/spoof_module.cpp) | Already used in OpenSpoof; consistent application | The original OpenSpoof also checks exceptions, but not for every field. |
+| `readRomVersionFromBuildProp()` (read /system/build.prop instead of system property) | [spoof_module.cpp:75-94](https://github.com/VD171/COPG-VD/blob/main/zygisk/spoof_module.cpp) | [src/spoof.cpp](src/spoof.cpp) `readRomVersionFromBuildProp()` | Survives a poisoned system property because /system/build.prop is on the read-only mount. |
+
+What was **not** adopted and why:
+
+- **nlohmann/json single-header** (979 KB). Apache-2.0 / MIT
+  compatible, but OpenSpoof's hand-rolled parser is 300 lines and
+  does not need a full JSON library. Worth swapping only if the
+  config schema grows significantly.
+- **`__cxa_atexit` polyfill** (`atexit.cpp`, AOSP 2020 copyright,
+  BSD-3-Clause). The host NDK already provides it. Only useful
+  for the older AOSP builds that the polyfill targets.
+- **i18n / 21 languages** (140 KB of JSON). Out of scope for the
+  current commit but a worthwhile follow-up.
+- **`CMakeLists.txt`** (645 bytes). Could replace the direct
+  `clang++` invocation in `scripts/build.sh`, but the current
+  script is simpler and works.
+- **The `service.sh` / `fingerprint-update.sh` patterns** (57 KB
+  combined). COPG-VD's service.sh is device-wide (one device for
+  all apps); OpenSpoof is per-app, so the patterns do not transfer
+  directly.
+
+Apache 2.0 attribution requirement (per License §4): the copyright
+notice and a copy of the License are present in this file (in
+the audit table above) and in [docs/CHANGELOG.md](CHANGELOG.md).
+The "Statement of Changes" lives in the same files. Modifications
+to the adopted code are described in the commit messages of the
+relevant commits; the `CHANGELOG.md` entry for this adoption
+points to the commits explicitly.
+
 ## Companion documents
 
 - [SPEC.md](SPEC.md) — OpenSpoof contract and architecture.

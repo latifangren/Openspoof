@@ -175,6 +175,73 @@ static void testLanguageRejectsSpace() {
            "language with space is rejected");
 }
 
+static void testVersionPolicyDefault() {
+    // Without an explicit version_policy the config must default
+    // to "rom" so a typo in the config does not silently enable
+    // Force.
+    const char* json = R"({
+      "apps": {},
+      "profiles": { "demo": { "BRAND": "google" } }
+    })";
+    Config cfg = loadFromString(json);
+    EXPECT(cfg.versionPolicy == openspoof_json::VersionPolicy::Rom,
+           "version_policy defaults to Rom");
+}
+
+static void testVersionPolicyExplicit() {
+    const char* json = R"({
+      "apps": {},
+      "version_policy": "FORCE",
+      "profiles": { "demo": { "BRAND": "google" } }
+    })";
+    Config cfg = loadFromString(json);
+    EXPECT(cfg.versionPolicy == openspoof_json::VersionPolicy::Force,
+           "version_policy=FORCE (case insensitive) parses to Force");
+}
+
+static void testVersionPolicyUnknownFallsBackToRom() {
+    // An unrecognised value should be a safe default, not a brick.
+    const char* json = R"({
+      "apps": {},
+      "version_policy": "nuke-it",
+      "profiles": { "demo": { "BRAND": "google" } }
+    })";
+    Config cfg = loadFromString(json);
+    EXPECT(cfg.versionPolicy == openspoof_json::VersionPolicy::Rom,
+           "unknown version_policy falls back to Rom");
+}
+
+static void testExtendedBuildFields() {
+    // The 6 fields we adopted from COPG-VD: BOOTLOADER, HOST,
+    // ODM_SKU, SKU, TAGS, TYPE, USER + TIMESTAMP.
+    const char* json = R"({
+      "apps": {},
+      "profiles": {
+        "demo": {
+          "BRAND": "google",
+          "BOOTLOADER": "a2.241105.006",
+          "HOST": "build.google.com",
+          "ODM_SKU": "pixel",
+          "SKU": "GA05833-USA",
+          "TAGS": "release-keys",
+          "TYPE": "user",
+          "USER": "androidbuild",
+          "TIMESTAMP": "1731340800000"
+        }
+      }
+    })";
+    Config cfg = loadFromString(json);
+    auto& p = cfg.profiles["demo"];
+    EXPECT(p.bootloader == "a2.241105.006", "BOOTLOADER parsed");
+    EXPECT(p.host == "build.google.com",      "HOST parsed");
+    EXPECT(p.odmSku == "pixel",               "ODM_SKU parsed");
+    EXPECT(p.sku == "GA05833-USA",            "SKU parsed");
+    EXPECT(p.tags == "release-keys",          "TAGS parsed");
+    EXPECT(p.type == "user",                  "TYPE parsed");
+    EXPECT(p.buildUser == "androidbuild",     "USER parsed");
+    EXPECT(p.time == 1731340800000LL,          "TIMESTAMP parsed as int64 ms");
+}
+
 static void testCombinedProfile() {
     // All three new fields together.
     const char* json = R"({
@@ -209,6 +276,10 @@ int main() {
     testFlagSecureMissing();
     testLanguage();
     testLanguageRejectsSpace();
+    testVersionPolicyDefault();
+    testVersionPolicyExplicit();
+    testVersionPolicyUnknownFallsBackToRom();
+    testExtendedBuildFields();
     testCombinedProfile();
     std::printf("---\nTotal: %d  Pass: %d  Fail: %d\n",
                 g_pass + g_fail, g_pass, g_fail);

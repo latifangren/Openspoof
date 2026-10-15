@@ -132,6 +132,69 @@ and the project does not yet adhere to Semantic Versioning — see
   armeabi-v7a and x86_64 link failures that would have
   surfaced on first non-arm64 packaging.
 
+### Added (COPG-VD v5.2.1 adoption, Apache-2.0)
+The following were adopted from [VD171/COPG-VD](https://github.com/VD171/COPG-VD)
+(Apache License 2.0). See [docs/REFERENCE-COPG.md](REFERENCE-COPG.md)
+"Adoption from COPG-VD v5.2.1" for the full attribution table,
+specific source lines, and rationale for what was and was not
+taken.
+
+* **Version policy.** New `version_policy: "rom" | "never" | "force"`
+  field at the top of `config.json` (default: `rom`). The C++
+  module reads `/system/build.prop` at `preAppSpecialize` to
+  learn the device's true `ro.build.version.{release,sdk,codename}`,
+  and refuses to write a config value that would raise
+  `SDK_INT` or `RELEASE` above the ROM's level. Without this
+  guard, a typo in a profile can soft-loop the device. `Never`
+  skips version writes entirely; `Force` overrides and is
+  the user's responsibility.
+* **17-field Build coverage.** `spoofBuild` now writes all
+  seventeen `android.os.Build` static fields (BRAND, DEVICE,
+  MANUFACTURER, MODEL, PRODUCT, BOARD, BOOTLOADER, HARDWARE,
+  FINGERPRINT, ID, DISPLAY, HOST, ODM_SKU, SKU, TAGS, TYPE,
+  USER, SERIAL) plus `Build.TIME` (long). The six added fields
+  (BOOTLOADER, HOST, ODM_SKU, SKU, TAGS, TYPE, USER) and TIME
+  were not previously set; they are common in Build-info apps
+  that compare the full identity.
+* **`Build.VERSION` extension.** Sets `SDK`, `SDK_INT_FULL`,
+  `RELEASE_OR_CODENAME`, and `RELEASE_OR_PREVIEW_DISPLAY`
+  in addition to the previously-set `RELEASE`, `INCREMENTAL`,
+  `CODENAME`, `SECURITY_PATCH`, and `SDK_INT`. All three
+  SDK-related fields are derived from the same `effectiveSdk`
+  so an app reading any of them sees the same number.
+* **`releaseOrCodename()` helper.** AOSP rule:
+  `RELEASE_OR_CODENAME = "REL" == CODENAME ? RELEASE : CODENAME`.
+  Without this, a profile that leaves CODENAME blank will
+  publish a literal "REL" in the slot where the version
+  number belongs, which no real device reports.
+
+### Modified
+* `module/config.default.json` documents `version_policy: "rom"`
+  at the top and adds the seven new Build fields plus
+  `TIMESTAMP` to the `pixel_9_pro` profile as a worked example.
+* `webroot/index.html` adds input fields for the seven new
+  Build fields, `TIMESTAMP`, and a top-level `version_policy`
+  selector inside the "Edit Build Fields" panel.
+
+### Tests
+* `tests/test_config_parser.cpp` gains four new tests:
+  `testVersionPolicyDefault`, `testVersionPolicyExplicit`,
+  `testVersionPolicyUnknownFallsBackToRom`, and
+  `testExtendedBuildFields`. All are green on the host
+  compiler; CI on `ubuntu-latest` runs them via the
+  existing `tests/run.sh` pipeline.
+
+### Attribution
+Per Apache License 2.0 §4 (Redistribution), the copyright notice
+"COPG-VD v5.2.1 — Copyright The COPG-VD Contributors. Licensed
+under the Apache License, Version 2.0." is reproduced in
+[docs/REFERENCE-COPG.md](REFERENCE-COPG.md). A copy of the
+Apache 2.0 License is available at
+<https://www.apache.org/licenses/LICENSE-2.0>. The Statement
+of Changes is this CHANGELOG entry, the commit message, and
+the per-adoption row in the table inside
+[docs/REFERENCE-COPG.md](REFERENCE-COPG.md).
+
 ## [v0.1.0] — initial skeleton
 
 - Phase 1: JNI `Build` field spoofing.

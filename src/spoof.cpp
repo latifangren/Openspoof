@@ -8,16 +8,24 @@
 // Phase B: Hardware Identifiers (Android ID, Telephony GSM properties, MAC address).
 // Phase C: DRM (MediaDrm.getPropertyString via RegisterNatives) and Geolocation
 //          hooks (cell LAC/CID, GPS via config in Phase D).
+// Phase 5: ART hooks (FLAG_SECURE, locale) via JNI RegisterNatives.
+//
+// Version policy and the 17-field Build coverage were adopted from
+// COPG-VD v5.2.1 (Apache License 2.0). See docs/REFERENCE-COPG.md.
 //
 // Build with the NDK: see scripts/build.sh
 // zygisk.hpp is fetched at build time from topjohnwu/zygisk-module-sample.
 
 #include <dlfcn.h>
+#include <fstream>
 #include <jni.h>
 #include <sched.h>
 #include <sys/mount.h>
 #include <unistd.h>
 
+#include <algorithm>
+#include <cctype>
+#include <cstdlib>
 #include <string>
 
 #include <android/log.h>
@@ -49,42 +57,187 @@ void setBuildString(JNIEnv* env, jclass cls, const char* name, const std::string
     env->DeleteLocalRef(jval);
 }
 
-void spoofBuild(JNIEnv* env, const Profile& p) {
+// --- Build version group policy ----------------------------------
+//
+// Read the ROM's true Android version from /system/build.prop.
+// We cannot trust the system property (this module overwrites
+// it), but /system/build.prop on the read-only mount survives.
+// RomVersion stays default-initialised if the file cannot be
+// read, which makes Rom policy a no-op.
+struct RomVersion {
+    std::string release;
+    std::string codename;
+    int sdk = 0;
+};
+
+static RomVersion readRomVersionFromBuildProp() {
+    RomVersion rom;
+    std::ifstream file("/system/build.prop");
+    if (!file.is_open()) return rom;
+    std::string line;
+    while (std::getline(file, line)) {
+        auto take = [&line](const char* key, std::string& out) {
+            std::string needle = std::string(key) + "=";
+            if (line.rfind(needle, 0) == 0) {
+                std::string val = line.substr(needle.size());
+                while (!val.empty() && (val.back() == '\r' || val.back() == '\n' ||
+                                         val.back() == ' ' || val.back() == '\t')) {
+                    val.pop_back();
+                }
+                out = val;
+            }
+        };
+        take("ro.build.version.release", rom.release);
+        take("ro.build.version.codename", rom.codename);
+        std::string sdk;
+        take("ro.build.version.sdk", sdk);
+        if (!sdk.empty()) {
+            try { rom.sdk = std::stoi(sdk); } catch (...) { rom.sdk = 0; }
+        }
+    }
+    return rom;
+}
+
+// Apply version policy to a candidate (release, sdkInt) pair.
+// Returns true if the candidate passes the policy, false to drop it.
+static bool versionAllowed(const VersionPolicy policy,
+                            const RomVersion& rom,
+                            const std::string& cfgRelease,
+                            int cfgSdk) {
+    if (policy == VersionPolicy::Force) return true;
+    if (policy == VersionPolicy::Never) return false;
+    // Rom: only what does not exceed the ROM. Lowering the SDK is
+    // safe; raising is what triggers API-not-found crashes.
+    if (cfgSdk > 0 && rom.sdk > 0 && cfgSdk > rom.sdk) return false;
+    if (!cfgRelease.empty() && !rom.release.empty() && cfgRelease != rom.release) {
+        // Compare the leading major number so a config of "11"
+        // on a 14 ROM is rejected while "13" on a 14 ROM is
+        // also rejected but "13" on a 13 ROM passes.
+        auto leading = [](const std::string& s) {
+            std::string n;
+            for (char c : s) {
+                if (std::isdigit((unsigned char)c)) n.push_back(c);
+                else break;
+            }
+            return n.empty() ? 0 : std::stoi(n);
+        };
+        int cfgN = 0, romN = 0;
+        try { cfgN = leading(cfgRelease); romN = leading(rom.release); } catch (...) {}
+        if (cfgN > romN) return false;
+    }
+    return true;
+}
+
+// AOSP rule: RELEASE_OR_CODENAME = "REL" == CODENAME ? RELEASE : CODENAME.
+// Copying a literal CODENAME into it publishes "REL" in the version
+// slot, which is a combination no real device reports.
+static std::string releaseOrCodename(const std::string& codename,
+                                      const std::string& release) {
+    return (codename.empty() || codename == "REL") ? release : codename;
+}
+
+void spoofBuild(JNIEnv* env, const Profile& p, VersionPolicy versionPolicy) {
+    // Decide version fields up front so the SDK_INT / RELEASE we
+    // finally write to Build.VERSION are consistent with each
+    // other and with the device-true ROM. readRomVersionFromBuildProp
+    // reads /system/build.prop which is on the read-only mount, so
+    // it sees the unmodified values even if some other module has
+    // already poisoned the system properties.
+    const RomVersion rom = readRomVersionFromBuildProp();
+    const bool versionOk = versionAllowed(versionPolicy, rom, p.release, p.sdkInt);
+    const std::string effectiveRelease = versionOk ? p.release : std::string();
+    const int effectiveSdk = (versionOk && p.sdkInt > 0) ? p.sdkInt : 0;
+    const std::string effectiveCodename = versionOk ? p.codename : std::string();
+
     jclass build = env->FindClass("android/os/Build");
     if (build == nullptr) {
         LOGD("android/os/Build not found");
         env->ExceptionClear();
         return;
     }
+    // 17 Build fields, including the six the original OpenSpoof
+    // skipped: BOOTLOADER, HOST, ODM_SKU, SKU, TAGS, TYPE, USER,
+    // and Build.TIME (long). Adopted from COPG-VD v5.2.1
+    // (Apache-2.0) — see docs/REFERENCE-COPG.md.
     setBuildString(env, build, "BRAND", p.brand);
     setBuildString(env, build, "DEVICE", p.device);
     setBuildString(env, build, "MANUFACTURER", p.manufacturer);
     setBuildString(env, build, "MODEL", p.model);
     setBuildString(env, build, "PRODUCT", p.product);
     setBuildString(env, build, "BOARD", p.board);
+    setBuildString(env, build, "BOOTLOADER", p.bootloader);
     setBuildString(env, build, "HARDWARE", p.hardware);
     setBuildString(env, build, "FINGERPRINT", p.fingerprint);
     setBuildString(env, build, "ID", p.id);
     setBuildString(env, build, "DISPLAY", p.display);
+    setBuildString(env, build, "HOST", p.host);
+    setBuildString(env, build, "ODM_SKU", p.odmSku);
+    setBuildString(env, build, "SKU", p.sku);
+    setBuildString(env, build, "TAGS", p.tags);
+    setBuildString(env, build, "TYPE", p.type);
+    setBuildString(env, build, "USER", p.buildUser);
     setBuildString(env, build, "SERIAL", p.serial);
 
-    jclass version = env->FindClass("android/os/Build$VERSION");
-    if (version != nullptr) {
-        setBuildString(env, version, "RELEASE", p.release);
-        setBuildString(env, version, "INCREMENTAL", p.incremental);
-        setBuildString(env, version, "CODENAME", p.codename);
-        setBuildString(env, version, "SECURITY_PATCH", p.securityPatch);
-        if (p.sdkInt > 0) {
-            jfieldID fid = env->GetStaticFieldID(version, "SDK_INT", "I");
-            if (fid != nullptr) {
-                env->SetStaticIntField(version, fid, p.sdkInt);
-            } else {
-                env->ExceptionClear();
-            }
+    if (p.time > 0) {
+        jfieldID fid = env->GetStaticFieldID(build, "TIME", "J");
+        if (fid != nullptr) {
+            env->SetStaticLongField(build, fid, (jlong)p.time);
+        } else {
+            env->ExceptionClear();
         }
-    } else {
-        env->ExceptionClear();
     }
+
+    jclass version = env->FindClass("android/os/Build$VERSION");
+    if (version == nullptr) {
+        env->ExceptionClear();
+        env->DeleteLocalRef(build);
+        return;
+    }
+    setBuildString(env, version, "RELEASE", effectiveRelease);
+    setBuildString(env, version, "INCREMENTAL", p.incremental);
+    setBuildString(env, version, "CODENAME", effectiveCodename);
+    setBuildString(env, version, "SECURITY_PATCH", p.securityPatch);
+
+    // SDK_INT, SDK_INT_FULL (API 31+), and SDK string. All three
+    // are derived from the same effectiveSdk so an app reading
+    // any of them sees the same number.
+    if (effectiveSdk > 0) {
+        jfieldID fid = env->GetStaticFieldID(version, "SDK_INT", "I");
+        if (fid != nullptr) {
+            env->SetStaticIntField(version, fid, effectiveSdk);
+        } else {
+            env->ExceptionClear();
+        }
+        jfieldID sdkFull = env->GetStaticFieldID(version, "SDK_INT_FULL", "I");
+        if (sdkFull != nullptr) {
+            env->SetStaticIntField(version, sdkFull, (jint)(effectiveSdk * 100000));
+        } else {
+            env->ExceptionClear();
+        }
+        jfieldID sdkStr = env->GetStaticFieldID(version, "SDK", "Ljava/lang/String;");
+        if (sdkStr != nullptr) {
+            jstring js = env->NewStringUTF(std::to_string(effectiveSdk).c_str());
+            if (js != nullptr) {
+                env->SetStaticObjectField(version, sdkStr, js);
+                env->DeleteLocalRef(js);
+            }
+        } else {
+            env->ExceptionClear();
+        }
+    }
+
+    // RELEASE_OR_CODENAME follows the AOSP rule. Set only if at
+    // least one of (codename, release) passed the policy.
+    if (!effectiveCodename.empty() || !effectiveRelease.empty()) {
+        std::string rec = releaseOrCodename(
+            effectiveCodename.empty() ? rom.codename : effectiveCodename,
+            effectiveRelease.empty() ? rom.release : effectiveRelease);
+        setBuildString(env, version, "RELEASE_OR_CODENAME", rec);
+        setBuildString(env, version, "RELEASE_OR_PREVIEW_DISPLAY", rec);
+    }
+
+    env->DeleteLocalRef(build);
+    env->DeleteLocalRef(version);
 }
 
 // --- Phase 2: /proc/cpuinfo, per-process -------------------------------------
@@ -251,7 +404,7 @@ public:
         languageTag_ = p->nativeHooks.languageTag;
 
         spoofCpuinfo(it->second);  // Phase 2 (no-op when no cpuinfo file for profile)
-        spoofBuild(env_, *p);      // Phase 1
+        spoofBuild(env_, *p, cfg.versionPolicy);  // Phase 1 + version policy
         spoofAndroidId(env_, androidId_); // Phase B (early attempt)
         installMediaDrmHook(env_, drm_);  // Phase C (early attempt)
         openspoof::InstallNativeHooks(p->nativeHooks);  // Phase 4 & PRO

@@ -109,15 +109,33 @@ struct NativeHooks {
 
 struct Profile {
     std::string brand, device, manufacturer, model, product;
-    std::string board, hardware, fingerprint, id, display, serial;
+    std::string board, bootloader, hardware, fingerprint, id, display;
+    std::string host, odmSku, sku, tags, type, buildUser, serial;
     std::string release, incremental, codename, securityPatch;
     int sdkInt = 0;
+    int64_t time = 0;   // Build.TIME (long, ms since epoch)
     NativeHooks nativeHooks;  // Phase 4: optional
 };
+
+// How the module should handle the Android version group (RELEASE,
+// SDK_INT, CODENAME, ...) when the user puts a profile in config.
+// The version lives in the ROM, not in the build being spoofed: an
+// app told the SDK is newer than the framework actually is will call
+// APIs that do not exist, Google's apps crash, the device reboots,
+// and the cycle repeats - a soft boot loop with nothing in the logs.
+//
+// never = never overwrite any version field (the real values stay).
+// rom   = only overwrite when the new value does not exceed what
+//         the ROM actually reports (in practice, lowering the SDK
+//         or matching the release). The default.
+// force = apply the config values regardless of ROM limits. The
+//         user takes responsibility for the softloop risk.
+enum class VersionPolicy { Never, Rom, Force };
 
 struct Config {
     std::map<std::string, Profile> profiles;  // profile key -> profile
     std::map<std::string, std::string> apps;   // package name -> profile key
+    VersionPolicy versionPolicy = VersionPolicy::Rom;  // adopted from COPG-VD v5.2.1 (Apache-2.0)
 
     const Profile* findProfile(const std::string& key) const {
         auto it = profiles.find(key);
@@ -239,12 +257,22 @@ inline void fillProfile(Profile& p, const Value& obj) {
     p.brand = get(obj, "BRAND"); p.device = get(obj, "DEVICE");
     p.manufacturer = get(obj, "MANUFACTURER"); p.model = get(obj, "MODEL");
     p.product = get(obj, "PRODUCT"); p.board = get(obj, "BOARD");
+    p.bootloader = get(obj, "BOOTLOADER");
     p.hardware = get(obj, "HARDWARE"); p.fingerprint = get(obj, "FINGERPRINT");
-    p.id = get(obj, "ID"); p.display = get(obj, "DISPLAY"); p.serial = get(obj, "SERIAL");
+    p.id = get(obj, "ID"); p.display = get(obj, "DISPLAY");
+    p.host = get(obj, "HOST"); p.odmSku = get(obj, "ODM_SKU");
+    p.sku = get(obj, "SKU"); p.tags = get(obj, "TAGS");
+    p.type = get(obj, "TYPE"); p.buildUser = get(obj, "USER");
+    p.serial = get(obj, "SERIAL");
     p.release = get(obj, "RELEASE"); p.incremental = get(obj, "INCREMENTAL");
     p.codename = get(obj, "CODENAME"); p.securityPatch = get(obj, "SECURITY_PATCH");
     std::string sdk = get(obj, "SDK_INT");
     if (!sdk.empty()) { try { p.sdkInt = std::stoi(sdk); } catch (...) {} }
+    // Build.TIME is a long (ms since epoch). We accept the JSON
+    // value as a string so the field type is uniform with the other
+    // string fields and the parser can stay defensive.
+    std::string ts = get(obj, "TIMESTAMP");
+    if (!ts.empty()) { try { p.time = std::stoll(ts); } catch (...) {} }
 
     // Phase 4: optional "native_hooks" object.
     auto nh = obj.object.find("native_hooks");
@@ -371,6 +399,18 @@ inline Config LoadConfig(const std::string& path) {
         for (const auto& kv : ait->second.object) {
             if (!kv.second.isObject) cfg.apps[kv.first] = kv.second.str;
         }
+    }
+    // version_policy: never | rom | force. Default rom. We accept
+    // any case and surrounding whitespace; unknown values fall back
+    // to rom rather than erroring out (a bad policy should not
+    // brick the module).
+    auto vit = root.object.find("version_policy");
+    if (vit != root.object.end() && !vit->second.isObject) {
+        std::string v = vit->second.str;
+        for (auto& c : v) c = (char)std::tolower((unsigned char)c);
+        if      (v == "never") cfg.versionPolicy = VersionPolicy::Never;
+        else if (v == "force") cfg.versionPolicy = VersionPolicy::Force;
+        else                    cfg.versionPolicy = VersionPolicy::Rom;
     }
     return cfg;
 }

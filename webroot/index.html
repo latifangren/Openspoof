@@ -365,14 +365,37 @@ function render() {
           <input data-bf="PRODUCT" value="${esc(p.PRODUCT || "")}" placeholder="caiman" style="width:180px"></div>
         <div class="row"><span class="prof grow">BOARD</span>
           <input data-bf="BOARD" value="${esc(p.BOARD || "")}" placeholder="caiman" style="width:180px"></div>
+        <div class="row"><span class="prof grow">BOOTLOADER</span>
+          <input data-bf="BOOTLOADER" value="${esc(p.BOOTLOADER || "")}" placeholder="a2.250105.006" style="width:180px"></div>
         <div class="row"><span class="prof grow">HARDWARE</span>
           <input data-bf="HARDWARE" value="${esc(p.HARDWARE || "")}" placeholder="caiman" style="width:180px"></div>
+        <div class="row"><span class="prof grow">HOST</span>
+          <input data-bf="HOST" value="${esc(p.HOST || "")}" placeholder="build.google.com" style="width:180px"></div>
+        <div class="row"><span class="prof grow">ODM_SKU</span>
+          <input data-bf="ODM_SKU" value="${esc(p.ODM_SKU || "")}" placeholder="pixel" style="width:180px"></div>
+        <div class="row"><span class="prof grow">SKU</span>
+          <input data-bf="SKU" value="${esc(p.SKU || "")}" placeholder="GA05833-USA" style="width:180px"></div>
         <div class="row"><span class="prof grow">FINGERPRINT</span>
           <input data-bf="FINGERPRINT" value="${esc(p.FINGERPRINT || "")}" placeholder="google/caiman/..." style="width:180px"></div>
+        <div class="row"><span class="prof grow">TAGS</span>
+          <input data-bf="TAGS" value="${esc(p.TAGS || "")}" placeholder="release-keys" style="width:180px"></div>
+        <div class="row"><span class="prof grow">TYPE</span>
+          <input data-bf="TYPE" value="${esc(p.TYPE || "")}" placeholder="user" style="width:180px"></div>
+        <div class="row"><span class="prof grow">USER (build user)</span>
+          <input data-bf="USER" value="${esc(p.USER || "")}" placeholder="androidbuild" style="width:180px"></div>
+        <div class="row"><span class="prof grow">TIMESTAMP (ms epoch)</span>
+          <input data-bf="TIMESTAMP" value="${esc(p.TIMESTAMP ?? "")}" placeholder="1731340800000" style="width:180px"></div>
         <div class="row"><span class="prof grow">SDK_INT</span>
           <input data-bf="SDK_INT" value="${esc(p.SDK_INT ?? "")}" placeholder="35" style="width:180px"></div>
         <div class="row"><span class="prof grow">RELEASE</span>
           <input data-bf="RELEASE" value="${esc(p.RELEASE || "")}" placeholder="17" style="width:180px"></div>
+        <div class="prof" style="margin-top:8px; color:#9a9ab0">Version policy (controls SDK_INT / RELEASE write-through above). "rom" is safe — see docs/SPEC.md.</div>
+        <div class="row"><span class="prof grow">version_policy</span>
+          <select data-cfg="version_policy" style="width:180px">
+            <option value="rom" ${cfg.version_policy === "rom" ? "selected" : ""}>rom (default, safe)</option>
+            <option value="never" ${cfg.version_policy === "never" ? "selected" : ""}>never</option>
+            <option value="force" ${cfg.version_policy === "force" ? "selected" : ""}>force (risky)</option>
+          </select></div>
       </details>
 
       <details>
@@ -489,13 +512,29 @@ function render() {
       log(`deleted profile ${k}`, "ok");
     };
 
-    // Build fields
-    ['MANUFACTURER', 'MODEL', 'BRAND', 'DEVICE', 'PRODUCT', 'BOARD', 'HARDWARE', 'FINGERPRINT', 'RELEASE'].forEach(bf => {
-      onch(`[data-bf="${bf}"]`, e => { p[bf] = e.target.value.trim(); });
+    // Build fields. Field names match the JSON keys the C++
+    // parser recognises (uppercase, including the new BOOTLOADER
+    // / HOST / ODM_SKU / SKU / TAGS / TYPE / USER / TIMESTAMP
+    // fields adopted from COPG-VD v5.2.1).
+    ['MANUFACTURER', 'MODEL', 'BRAND', 'DEVICE', 'PRODUCT', 'BOARD',
+     'BOOTLOADER', 'HARDWARE', 'HOST', 'ODM_SKU', 'SKU',
+     'FINGERPRINT', 'TAGS', 'TYPE', 'USER', 'RELEASE'].forEach(bf => {
+      onch(`[data-bf="${bf}"]`, e => {
+        const v = e.target.value.trim();
+        if (v) p[bf] = v; else delete p[bf];
+      });
     });
     onch('[data-bf="SDK_INT"]', e => {
       const num = parseInt(e.target.value, 10);
       p.SDK_INT = isNaN(num) ? 0 : num;
+    });
+    onch('[data-bf="TIMESTAMP"]', e => {
+      const num = parseInt(e.target.value, 10);
+      p.TIMESTAMP = isNaN(num) ? 0 : num;
+    });
+    // Top-level config field, not per-profile.
+    onch('[data-cfg="version_policy"]', e => {
+      cfg.version_policy = e.target.value;
     });
 
     // Native & PRO hooks

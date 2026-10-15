@@ -1,4 +1,6 @@
 {
+  "_comment": "version_policy: how to handle the Build.VERSION group. 'rom' (default) is the safe choice — never raise SDK_INT or RELEASE above what the device's actual ROM supports, which would crash apps that call APIs the framework does not have. 'never' means do not overwrite any version field. 'force' applies the config values regardless and risks a soft boot loop. The policy is read from /system/build.prop at preAppSpecialize, so the check survives even if some other module has poisoned the system properties. Adopted from COPG-VD v5.2.1 (Apache-2.0).",
+  "version_policy": "rom",
   "apps": {
     "com.tencent.tmgp.sgame": "redmagic_9_pro"
   },
@@ -101,19 +103,27 @@
     },
     "pixel_9_pro": {
       "BOARD": "caiman",
+      "BOOTLOADER": "a2.250105.006",
       "BRAND": "google",
       "DEVICE": "caiman",
       "DISPLAY": "CP3A.260905.009",
       "FINGERPRINT": "google/caiman/caiman:17/CP3A.260905.009/16091614:user/release-keys",
       "HARDWARE": "caiman",
+      "HOST": "build.google.com",
       "ID": "CP3A.260905.009",
       "INCREMENTAL": "16091614",
       "MANUFACTURER": "Google",
       "MODEL": "Pixel 9 Pro",
+      "ODM_SKU": "pixel",
       "PRODUCT": "caiman",
       "RELEASE": "17",
       "SDK_INT": 35,
       "SECURITY_PATCH": "2025-01-05",
+      "SKU": "GA05833-USA",
+      "TAGS": "release-keys",
+      "TIMESTAMP": "1731340800000",
+      "TYPE": "user",
+      "USER": "androidbuild",
       "native_hooks": {
         "gpu": {
           "vendor": "ARM",

@@ -12,15 +12,28 @@
 #include <utility>
 
 // Phase 4: per-profile native hooks (all fields optional).
+struct GpuConfig {
+    std::string vendor;     // e.g. "Qualcomm"
+    std::string renderer;   // e.g. "Adreno (TM) 750" or "Adreno (TM) 830"
+    std::string version;    // e.g. "OpenGL ES 3.2 V@0750.0"
+    std::string eglVendor;  // e.g. "Qualcomm"
+    std::string eglVersion; // e.g. "1.5"
+
+    bool enabled() const {
+        return !renderer.empty() || !vendor.empty() || !eglVendor.empty();
+    }
+};
+
 struct NativeHooks {
     long uptimeOffsetSec = 0;                  // F4a: shift CLOCK_BOOTTIME/MONOTONIC
     std::string unameMachine;                  // F4b
     std::string unameSysname;                  // F4b
     std::map<std::string, std::string> props;  // F4c: key -> spoofed value
+    GpuConfig gpu;                             // F4e: GPU / OpenGL / EGL / Vulkan
 
     bool enabled() const {
         return uptimeOffsetSec != 0 || !unameMachine.empty() ||
-               !unameSysname.empty() || !props.empty();
+               !unameSysname.empty() || !props.empty() || gpu.enabled();
     }
 };
 
@@ -163,6 +176,14 @@ inline void fillProfile(Profile& p, const Value& obj) {
             for (const auto& kv : pr->second.object) {
                 if (!kv.second.isObject) p.nativeHooks.props[kv.first] = kv.second.str;
             }
+        }
+        auto gpuObj = o.object.find("gpu");
+        if (gpuObj != o.object.end() && gpuObj->second.isObject) {
+            p.nativeHooks.gpu.vendor = get(gpuObj->second, "vendor");
+            p.nativeHooks.gpu.renderer = get(gpuObj->second, "renderer");
+            p.nativeHooks.gpu.version = get(gpuObj->second, "version");
+            p.nativeHooks.gpu.eglVendor = get(gpuObj->second, "egl_vendor");
+            p.nativeHooks.gpu.eglVersion = get(gpuObj->second, "egl_version");
         }
     }
 }

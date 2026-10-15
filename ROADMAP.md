@@ -14,9 +14,11 @@ OpenSpoof dirancang sebagai alternatif open-source dan bebas lisensi untuk devic
 | **Phase 1: Java Build Fields** | ✅ Selesai (Skeleton) | `src/spoof.cpp` | Override field `Build.*` & `Build.VERSION.*` via JNI di `preAppSpecialize`. Belum uji live di device root fisik. |
 | **Phase 2: CPU VFS Spoof** | ✅ Selesai (Skeleton) | `src/spoof.cpp`, `module/cpuinfo/` | `unshare(CLONE_NEWNS)` + `mount(MS_BIND)` `/proc/cpuinfo` per-proses (masih root). Contoh profil RedMagic 9 Pro (SD 8 Gen 3) siap. |
 | **Phase 3: WebUI Manager** | ✅ Selesai (MVP) | `webroot/index.html` | Antarmuka gelap modern, filter app, autocomplete paket via `pm`, editor profil, simpan atomic config via bridge root (KernelSU / APatch / Magisk). |
-| **Phase 4: Native Hooks (Dobby)** | 🟡 Terverifikasi Sintaks | `src/hooks.cpp`, `third_party/dobby/` | Dobby di-vendor. Hook prototype untuk `clock_gettime` (uptime), `uname`, dan `__system_property_get` lolos compile-check lawan header asli. Memerlukan build `libdobby.a` via NDK. |
-| **Packaging & Build System** | 🟡 Skrip Bash Dasar | `scripts/build.sh` | Direct Clang NDK script. Menghasilkan module zip untuk arm64-v8a, armeabi-v7a, x86_64. Belum ada pipeline CMake otomatis untuk Dobby. |
-| **Safety Daemon** | 🔴 Belum Ada | — | Belum ada `service.sh` boot-time validator atau auto-rollback jika `config.json` korup/rusak. |
+| **Phase 4: Native Hooks (Dobby)** | ✅ Diimplementasi | `src/hooks.cpp`, `third_party/dobby/` | Dobby di-vendor. Hook untuk `clock_gettime` (uptime), `uname`, `__system_property_get`, dan **GPU Spoofing** (`glGetString`, `eglQueryString`, `eglGetProcAddress`, `vkGetPhysicalDeviceProperties`). |
+| **PRO: GPU Spoofing Engine** | ✅ Selesai (Phase A) | `src/hooks.cpp`, `src/config.h` | Intercept GL_RENDERER, GL_VENDOR, EGL strings & Vulkan device name. Presets Adreno 750/830 & Mali-G715. |
+| **Device Catalog** | ✅ Selesai | `module/devices.conf` | Katalog preset flagship: RedMagic 9 Pro, ROG Phone 8 Pro, Galaxy S24 Ultra, Pixel 8/9 Pro. |
+| **Packaging & Build System** | 🟡 Skrip Bash Dasar | `scripts/build.sh` | Direct Clang NDK script. Menghasilkan module zip untuk arm64-v8a, armeabi-v7a, x86_64. |
+| **Safety Daemon** | ✅ Selesai (Phase A) | `module/service.sh` | Boot daemon dengan auto-recovery, backup rollback (`config.backup.json`), dan emergency bypass sentinel (`.disable_openspoof`). |
 
 ---
 

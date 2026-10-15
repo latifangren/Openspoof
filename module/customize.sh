@@ -22,6 +22,8 @@ set_perm "$MODPATH/zygisk/arm64-v8a.so" 0 0 0644 2>/dev/null || true
 set_perm "$MODPATH/zygisk/armeabi-v7a.so" 0 0 0644 2>/dev/null || true
 set_perm "$MODPATH/zygisk/x86_64.so" 0 0 0644 2>/dev/null || true
 set_perm "$MODPATH/config.json" 0 0 0644
+set_perm "$MODPATH/devices.conf" 0 0 0644
+set_perm "$MODPATH/service.sh" 0 0 0755
 set_perm "$MODPATH/uninstall.sh" 0 0 0755
 
 if [ -f "$MODPATH/config.json.bak" ]; then

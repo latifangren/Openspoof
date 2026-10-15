@@ -118,25 +118,45 @@ function render() {
   for (const [k, p] of Object.entries(cfg.profiles)) {
     p.native_hooks ||= {};
     const nh = p.native_hooks;
-    nh.uname ||= {}; nh.props ||= {};
+    nh.uname ||= {}; nh.props ||= {}; nh.gpu ||= {};
     const d = document.createElement("div");
     d.className = "card";
     d.innerHTML = `<div class="row"><b class="grow">${esc(k)}</b></div>
       <div class="prof">MODEL <b>${esc(p.MODEL || "-")}</b> · BRAND <b>${esc(p.BRAND || "-")}</b><br>
       FINGERPRINT <b>${esc((p.FINGERPRINT || "-").slice(0, 60))}…</b><br>
       Android <b>${esc(p.RELEASE || "-")}</b> (SDK <b>${esc(String(p.SDK_INT ?? "-"))}</b>)</div>
-      <details><summary class="prof">Native hooks (advanced)</summary>
+      <details><summary class="prof">Native hooks &amp; GPU Spoof (advanced)</summary>
+        <div class="prof" style="margin-top:8px; color:#38bdf8">🎮 GPU Spoofing (OpenGL / Vulkan)</div>
+        <div class="row"><span class="prof grow">GPU Renderer</span>
+          <input data-nh="gpu-renderer" value="${esc(nh.gpu.renderer || "")}" placeholder="Adreno (TM) 750" style="width:180px"></div>
+        <div class="row"><span class="prof grow">GPU Vendor</span>
+          <input data-nh="gpu-vendor" value="${esc(nh.gpu.vendor || "")}" placeholder="Qualcomm" style="width:180px"></div>
+        <div class="row"><span class="prof grow">GLES Version</span>
+          <input data-nh="gpu-version" value="${esc(nh.gpu.version || "")}" placeholder="OpenGL ES 3.2 V@0750.0" style="width:180px"></div>
+        <div class="prof" style="margin-top:8px">⚙️ System &amp; Uptime</div>
         <div class="row"><span class="prof grow">Uptime offset (sec)</span>
-          <input data-nh="uptime" type="number" value="${nh.uptime_offset_sec ?? ""}" placeholder="e.g. 172800" style="width:150px"></div>
+          <input data-nh="uptime" type="number" value="${nh.uptime_offset_sec ?? ""}" placeholder="e.g. 172800" style="width:180px"></div>
         <div class="row"><span class="prof grow">uname machine</span>
-          <input data-nh="machine" value="${esc(nh.uname.machine || "")}" placeholder="aarch64" style="width:150px"></div>
+          <input data-nh="machine" value="${esc(nh.uname.machine || "")}" placeholder="aarch64" style="width:180px"></div>
         <div class="row"><span class="prof grow">uname sysname</span>
-          <input data-nh="sysname" value="${esc(nh.uname.sysname || "")}" placeholder="Linux" style="width:150px"></div>
+          <input data-nh="sysname" value="${esc(nh.uname.sysname || "")}" placeholder="Linux" style="width:180px"></div>
         <div class="prof" style="margin-top:6px">Prop overrides</div>
         <div data-props></div>
         <div class="row"><button data-addprop>Add prop</button></div>
       </details>`;
     const q = s => d.querySelector(s);
+    q('[data-nh="gpu-renderer"]').onchange = e => {
+      nh.gpu.renderer = e.target.value.trim();
+      if (!nh.gpu.renderer) delete nh.gpu.renderer;
+    };
+    q('[data-nh="gpu-vendor"]').onchange = e => {
+      nh.gpu.vendor = e.target.value.trim();
+      if (!nh.gpu.vendor) delete nh.gpu.vendor;
+    };
+    q('[data-nh="gpu-version"]').onchange = e => {
+      nh.gpu.version = e.target.value.trim();
+      if (!nh.gpu.version) delete nh.gpu.version;
+    };
     q('[data-nh="uptime"]').onchange = e => {
       const v = parseInt(e.target.value, 10);
       if (isNaN(v) || v === 0) delete nh.uptime_offset_sec; else nh.uptime_offset_sec = v;

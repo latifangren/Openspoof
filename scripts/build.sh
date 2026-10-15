@@ -45,7 +45,7 @@ build_abi aarch64 arm64-v8a
 build_abi armv7a armeabi-v7a
 build_abi x86_64 x86_64
 
-chmod 0755 module/customize.sh module/uninstall.sh \
+chmod 0755 module/customize.sh module/service.sh module/uninstall.sh \
   module/META-INF/com/google/android/update-binary
 
 sed -i "s/^version=.*/version=v$VERSION/" module/module.prop

@@ -60,20 +60,25 @@ jobs:
           ./tests/run.sh
 
       # Cheap static check: catch syntax errors in C++ without paying
-      # for a full NDK build. The host clang binary is used (faster
-      # than the NDK toolchain), but the NDK sysroot usr/include
-      # directory is added so jni.h and android/log.h resolve. The
-      # __ANDROID_API__ macro matches the build target (android-21) so
-      # version-gated declarations in the headers compile.
-      - name: C++ syntax check (host clang + NDK sysroot)
+      # for a full NDK link. We use the NDK's own clang++ so the
+      # sysroot and target triple are configured exactly the way
+      # scripts/build.sh configures them at build time. That way
+      # jni.h, android/log.h, and any other NDK header resolve
+      # without us having to hand-roll include paths that drift
+      # across NDK versions.
+      - name: C++ syntax check (NDK clang++)
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
-          clang++ -fsyntax-only -std=c++17 -Wall -Wextra \
+          NDK_CLANG="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++"
+          echo "Using NDK clang: $NDK_CLANG"
+          ls -la "$NDK_CLANG" || true
+          "$NDK_CLANG" -fsyntax-only -std=c++17 -Wall -Wextra \
             -I src \
-            -I "$ANDROID_NDK_HOME/sysroot/usr/include" \
+            --target=x86_64-linux-android21 \
+            --sysroot="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/sysroot" \
             -D__ANDROID_API__=21 \
-            src/spoof.cpp src/hooks.cpp 2>&1 | tee cxx-syntax.log
+            src/spoof.cpp src/hooks.cpp src/f5_art_hooks.cpp 2>&1 | tee cxx-syntax.log
 
       # Lint the shell scripts that ship in module/, scripts/, and tests/.
       # We use --severity=warning so style nits don't fail the run, but

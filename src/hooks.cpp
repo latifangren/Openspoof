@@ -9,6 +9,8 @@
 //   - F4b: fake uname (uname)
 //   - F4c: fake native properties (__system_property_get)
 //   - F4e: GPU Spoofing (glGetString, eglQueryString, eglGetProcAddress, vkGetPhysicalDeviceProperties)
+//   - Phase B: Telephony & SIM Identifiers (IMEI, IMSI, ICCID, Operator via __system_property_get)
+//   - Phase B: Hardware MAC address spoofing via ioctl(SIOCGIFHWADDR)
 //
 // Build: vendor Dobby at third_party/dobby, build libdobby.a, compile with
 // -DHAVE_DOBBY -I third_party/dobby/include. Without it this file compiles
@@ -25,7 +27,10 @@
 #include <string.h>
 #include <time.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <sys/utsname.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
 
 #include "dobby.h"
 #endif
@@ -83,6 +88,25 @@ int fake_system_property_get(const char* name, char* value) {
         return (int)n;
     }
     return orig_system_property_get(name, value);
+}
+
+// --- Phase B: MAC address spoofing via ioctl(SIOCGIFHWADDR) -------------------
+static int (*orig_ioctl)(int, unsigned long, ...) = nullptr;
+static std::string g_mac_address;
+
+int fake_ioctl(int fd, unsigned long request, void* argp) {
+    int r = orig_ioctl(fd, request, argp);
+    if (r == 0 && request == SIOCGIFHWADDR && argp != nullptr && !g_mac_address.empty()) {
+        auto* ifr = reinterpret_cast<struct ifreq*>(argp);
+        unsigned int m[6];
+        if (sscanf(g_mac_address.c_str(), "%x:%x:%x:%x:%x:%x",
+                   &m[0], &m[1], &m[2], &m[3], &m[4], &m[5]) == 6) {
+            for (int i = 0; i < 6; i++) {
+                ifr->ifr_hwaddr.sa_data[i] = static_cast<char>(m[i]);
+            }
+        }
+    }
+    return r;
 }
 
 // --- F4e: GPU / OpenGL & EGL Intercept (PRO Tier) ------------------------------
@@ -227,11 +251,42 @@ bool InstallNativeHooks(const NativeHooks& h) {
         any |= hookOne(nullptr, "uname", (void*)fake_uname, (void**)&orig_uname, "uname");
     }
 
-    // F4c: __system_property_get
-    if (!h.props.empty()) {
-        g_props = h.props;
+    // Phase B: Telephony & SIM Identifiers (GSM System Properties)
+    if (h.telephony.enabled()) {
+        const auto& t = h.telephony;
+        if (!t.simOperator.empty()) {
+            g_props["gsm.sim.operator.numeric"] = t.simOperator;
+            g_props["gsm.operator.numeric"] = t.simOperator;
+        }
+        if (!t.simOperatorName.empty()) {
+            g_props["gsm.sim.operator.alpha"] = t.simOperatorName;
+            g_props["gsm.operator.alpha"] = t.simOperatorName;
+        }
+        if (!t.simCountryIso.empty()) {
+            g_props["gsm.sim.operator.iso-country"] = t.simCountryIso;
+            g_props["gsm.operator.iso-country"] = t.simCountryIso;
+        }
+        if (!t.imei.empty()) {
+            g_props["persist.radio.imei"] = t.imei;
+            g_props["ro.ril.oem.imei"] = t.imei;
+        }
+        g_props["gsm.sim.state"] = "LOADED";
+    }
+
+    // F4c: __system_property_get (must be installed if custom props or telephony configured)
+    if (!h.props.empty() || h.telephony.enabled()) {
+        for (const auto& kv : h.props) {
+            g_props[kv.first] = kv.second;
+        }
         any |= hookOne(nullptr, "__system_property_get", (void*)fake_system_property_get,
                        (void**)&orig_system_property_get, "__system_property_get");
+    }
+
+    // Phase B: Hardware Identifiers (MAC address via ioctl)
+    if (h.id.enabled() && !h.id.macAddress.empty()) {
+        g_mac_address = h.id.macAddress;
+        any |= hookOne("libc.so", "ioctl", (void*)fake_ioctl,
+                       (void**)&orig_ioctl, "ioctl (SIOCGIFHWADDR)");
     }
 
     // F4e & F4f: GPU Spoofing (OpenGL, EGL, Vulkan)

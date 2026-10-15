@@ -24,16 +24,44 @@ struct GpuConfig {
     }
 };
 
+// Phase B: Telephony & SIM Identifiers (IMEI, IMSI, ICCID, Operator)
+struct TelephonyConfig {
+    std::string imei;               // 15-digit IMEI
+    std::string imsi;               // 15-digit IMSI
+    std::string iccid;              // 20-digit ICCID
+    std::string simOperator;        // e.g. "310260"
+    std::string simOperatorName;    // e.g. "T-Mobile"
+    std::string simCountryIso;      // e.g. "us"
+    std::string phoneType;          // e.g. "1" (GSM)
+
+    bool enabled() const {
+        return !imei.empty() || !imsi.empty() || !iccid.empty() || !simOperator.empty();
+    }
+};
+
+// Phase B: Hardware & System Identifiers (Android ID, MAC)
+struct IdentifierConfig {
+    std::string androidId;          // 16-hex digit Android ID
+    std::string macAddress;         // e.g. "00:1A:2B:3C:4D:5E"
+
+    bool enabled() const {
+        return !androidId.empty() || !macAddress.empty();
+    }
+};
+
 struct NativeHooks {
     long uptimeOffsetSec = 0;                  // F4a: shift CLOCK_BOOTTIME/MONOTONIC
     std::string unameMachine;                  // F4b
     std::string unameSysname;                  // F4b
     std::map<std::string, std::string> props;  // F4c: key -> spoofed value
     GpuConfig gpu;                             // F4e: GPU / OpenGL / EGL / Vulkan
+    TelephonyConfig telephony;                  // Phase B: Telephony & SIM
+    IdentifierConfig id;                       // Phase B: Android ID & MAC
 
     bool enabled() const {
         return uptimeOffsetSec != 0 || !unameMachine.empty() ||
-               !unameSysname.empty() || !props.empty() || gpu.enabled();
+               !unameSysname.empty() || !props.empty() || gpu.enabled() ||
+               telephony.enabled() || id.enabled();
     }
 };
 
@@ -184,6 +212,21 @@ inline void fillProfile(Profile& p, const Value& obj) {
             p.nativeHooks.gpu.version = get(gpuObj->second, "version");
             p.nativeHooks.gpu.eglVendor = get(gpuObj->second, "egl_vendor");
             p.nativeHooks.gpu.eglVersion = get(gpuObj->second, "egl_version");
+        }
+        auto telObj = o.object.find("telephony");
+        if (telObj != o.object.end() && telObj->second.isObject) {
+            p.nativeHooks.telephony.imei = get(telObj->second, "imei");
+            p.nativeHooks.telephony.imsi = get(telObj->second, "imsi");
+            p.nativeHooks.telephony.iccid = get(telObj->second, "iccid");
+            p.nativeHooks.telephony.simOperator = get(telObj->second, "sim_operator");
+            p.nativeHooks.telephony.simOperatorName = get(telObj->second, "sim_operator_name");
+            p.nativeHooks.telephony.simCountryIso = get(telObj->second, "sim_country_iso");
+            p.nativeHooks.telephony.phoneType = get(telObj->second, "phone_type");
+        }
+        auto idObj = o.object.find("id");
+        if (idObj != o.object.end() && idObj->second.isObject) {
+            p.nativeHooks.id.androidId = get(idObj->second, "android_id");
+            p.nativeHooks.id.macAddress = get(idObj->second, "mac_address");
         }
     }
 }

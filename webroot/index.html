@@ -125,26 +125,58 @@ function render() {
       <div class="prof">MODEL <b>${esc(p.MODEL || "-")}</b> · BRAND <b>${esc(p.BRAND || "-")}</b><br>
       FINGERPRINT <b>${esc((p.FINGERPRINT || "-").slice(0, 60))}…</b><br>
       Android <b>${esc(p.RELEASE || "-")}</b> (SDK <b>${esc(String(p.SDK_INT ?? "-"))}</b>)</div>
-      <details><summary class="prof">Native hooks &amp; GPU Spoof (advanced)</summary>
+      <details><summary class="prof">Native hooks &amp; PRO Spoof (advanced)</summary>
         <div class="prof" style="margin-top:8px; color:#38bdf8">🎮 GPU Spoofing (OpenGL / Vulkan)</div>
         <div class="row"><span class="prof grow">GPU Renderer</span>
-          <input data-nh="gpu-renderer" value="${esc(nh.gpu.renderer || "")}" placeholder="Adreno (TM) 750" style="width:180px"></div>
+          <input data-nh="gpu-renderer" value="${esc(nh.gpu?.renderer || "")}" placeholder="Adreno (TM) 750" style="width:180px"></div>
         <div class="row"><span class="prof grow">GPU Vendor</span>
-          <input data-nh="gpu-vendor" value="${esc(nh.gpu.vendor || "")}" placeholder="Qualcomm" style="width:180px"></div>
+          <input data-nh="gpu-vendor" value="${esc(nh.gpu?.vendor || "")}" placeholder="Qualcomm" style="width:180px"></div>
         <div class="row"><span class="prof grow">GLES Version</span>
-          <input data-nh="gpu-version" value="${esc(nh.gpu.version || "")}" placeholder="OpenGL ES 3.2 V@0750.0" style="width:180px"></div>
+          <input data-nh="gpu-version" value="${esc(nh.gpu?.version || "")}" placeholder="OpenGL ES 3.2 V@0750.0" style="width:180px"></div>
+        <div class="prof" style="margin-top:8px; color:#a78bfa">📱 Identity &amp; Telephony (PRO Tier)</div>
+        <div class="row"><span class="prof grow">Android ID</span>
+          <input data-nh="android-id" value="${esc(nh.id?.android_id || "")}" placeholder="16-hex digits" style="width:180px"></div>
+        <div class="row"><span class="prof grow">Hardware MAC</span>
+          <input data-nh="mac" value="${esc(nh.id?.mac_address || "")}" placeholder="02:42:AC:11:00:2A" style="width:180px"></div>
+        <div class="row"><span class="prof grow">IMEI</span>
+          <input data-nh="imei" value="${esc(nh.telephony?.imei || "")}" placeholder="15 digits" style="width:180px"></div>
+        <div class="row"><span class="prof grow">SIM Operator</span>
+          <input data-nh="sim-op" value="${esc(nh.telephony?.sim_operator || "")}" placeholder="310260" style="width:180px"></div>
+        <div class="row"><span class="prof grow">Operator Name</span>
+          <input data-nh="sim-name" value="${esc(nh.telephony?.sim_operator_name || "")}" placeholder="T-Mobile" style="width:180px"></div>
         <div class="prof" style="margin-top:8px">⚙️ System &amp; Uptime</div>
         <div class="row"><span class="prof grow">Uptime offset (sec)</span>
           <input data-nh="uptime" type="number" value="${nh.uptime_offset_sec ?? ""}" placeholder="e.g. 172800" style="width:180px"></div>
         <div class="row"><span class="prof grow">uname machine</span>
-          <input data-nh="machine" value="${esc(nh.uname.machine || "")}" placeholder="aarch64" style="width:180px"></div>
+          <input data-nh="machine" value="${esc(nh.uname?.machine || "")}" placeholder="aarch64" style="width:180px"></div>
         <div class="row"><span class="prof grow">uname sysname</span>
-          <input data-nh="sysname" value="${esc(nh.uname.sysname || "")}" placeholder="Linux" style="width:180px"></div>
+          <input data-nh="sysname" value="${esc(nh.uname?.sysname || "")}" placeholder="Linux" style="width:180px"></div>
         <div class="prof" style="margin-top:6px">Prop overrides</div>
         <div data-props></div>
         <div class="row"><button data-addprop>Add prop</button></div>
       </details>`;
     const q = s => d.querySelector(s);
+    nh.id ||= {}; nh.telephony ||= {};
+    q('[data-nh="android-id"]').onchange = e => {
+      nh.id.android_id = e.target.value.trim();
+      if (!nh.id.android_id) delete nh.id.android_id;
+    };
+    q('[data-nh="mac"]').onchange = e => {
+      nh.id.mac_address = e.target.value.trim();
+      if (!nh.id.mac_address) delete nh.id.mac_address;
+    };
+    q('[data-nh="imei"]').onchange = e => {
+      nh.telephony.imei = e.target.value.trim();
+      if (!nh.telephony.imei) delete nh.telephony.imei;
+    };
+    q('[data-nh="sim-op"]').onchange = e => {
+      nh.telephony.sim_operator = e.target.value.trim();
+      if (!nh.telephony.sim_operator) delete nh.telephony.sim_operator;
+    };
+    q('[data-nh="sim-name"]').onchange = e => {
+      nh.telephony.sim_operator_name = e.target.value.trim();
+      if (!nh.telephony.sim_operator_name) delete nh.telephony.sim_operator_name;
+    };
     q('[data-nh="gpu-renderer"]').onchange = e => {
       nh.gpu.renderer = e.target.value.trim();
       if (!nh.gpu.renderer) delete nh.gpu.renderer;

@@ -26,6 +26,18 @@
           "egl_vendor": "Qualcomm",
           "egl_version": "1.5"
         },
+        "telephony": {
+          "imei": "860472048194721",
+          "imsi": "310260123456789",
+          "iccid": "89012607823901234567",
+          "sim_operator": "310260",
+          "sim_operator_name": "T-Mobile",
+          "sim_country_iso": "us"
+        },
+        "id": {
+          "android_id": "7b39a48f10c2e5d9",
+          "mac_address": "02:42:AC:11:00:2A"
+        },
         "props": {
           "ro.product.brand": "nubia",
           "ro.product.model": "NX769J"

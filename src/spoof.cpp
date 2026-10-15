@@ -4,6 +4,8 @@
 //          No inline-hook engine needed — Build fields are public statics.
 // Phase 2: per-process /proc/cpuinfo via mount-namespace bind-mount.
 //          preAppSpecialize runs while the process is still root.
+// Phase 4: Native hooks via Dobby (__system_property_get, uname, uptime, GPU).
+// Phase B: Hardware Identifiers (Android ID, Telephony GSM properties, MAC address).
 //
 // Build with the NDK: see scripts/build.sh
 // zygisk.hpp is fetched at build time from topjohnwu/zygisk-module-sample.
@@ -103,6 +105,53 @@ void spoofCpuinfo(const std::string& profileKey) {
     }
 }
 
+// --- Phase B: Android ID Spoofing via Settings.Secure cache ------------------
+void spoofAndroidId(JNIEnv* env, const std::string& androidId) {
+    if (androidId.empty() || env == nullptr) return;
+    jclass secureCls = env->FindClass("android/provider/Settings$Secure");
+    if (secureCls == nullptr) {
+        env->ExceptionClear();
+        return;
+    }
+    jfieldID cacheFid = env->GetStaticFieldID(secureCls, "sNameValueCache", "Landroid/provider/Settings$NameValueCache;");
+    if (cacheFid == nullptr) {
+        env->ExceptionClear();
+        return;
+    }
+    jobject cacheObj = env->GetStaticObjectField(secureCls, cacheFid);
+    if (cacheObj == nullptr) {
+        env->ExceptionClear();
+        return;
+    }
+    jclass cacheCls = env->GetObjectClass(cacheObj);
+    jfieldID valuesFid = env->GetFieldID(cacheCls, "mValues", "Landroid/util/ArrayMap;");
+    if (valuesFid == nullptr) {
+        env->ExceptionClear();
+        valuesFid = env->GetFieldID(cacheCls, "mValues", "Ljava/util/Map;");
+    }
+    if (valuesFid != nullptr) {
+        jobject mapObj = env->GetObjectField(cacheObj, valuesFid);
+        if (mapObj != nullptr) {
+            jclass mapCls = env->FindClass("java/util/Map");
+            if (mapCls != nullptr) {
+                jmethodID putMid = env->GetMethodID(mapCls, "put",
+                    "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+                if (putMid != nullptr) {
+                    jstring k = env->NewStringUTF("android_id");
+                    jstring v = env->NewStringUTF(androidId.c_str());
+                    env->CallObjectMethod(mapObj, putMid, k, v);
+                    env->DeleteLocalRef(k);
+                    env->DeleteLocalRef(v);
+                    LOGD("android_id spoofed in Settings$NameValueCache: %s", androidId.c_str());
+                }
+            }
+        }
+    }
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+    }
+}
+
 }  // namespace
 
 class OpenSpoof : public zygisk::ModuleBase {
@@ -129,15 +178,24 @@ public:
             LOGD("profile '%s' not found, skipping %s", it->second.c_str(), process.c_str());
             return;
         }
+        androidId_ = p->nativeHooks.id.androidId;
         spoofCpuinfo(it->second);  // Phase 2 (no-op when no cpuinfo file for profile)
         spoofBuild(env_, *p);      // Phase 1
-        openspoof::InstallNativeHooks(p->nativeHooks);  // Phase 4 (no-op without Dobby)
+        spoofAndroidId(env_, androidId_); // Phase B (early attempt)
+        openspoof::InstallNativeHooks(p->nativeHooks);  // Phase 4 & PRO
         LOGD("spoofed %s as profile '%s'", process.c_str(), it->second.c_str());
+    }
+
+    void postAppSpecialize(const AppSpecializeArgs*) override {
+        if (!androidId_.empty()) {
+            spoofAndroidId(env_, androidId_); // Phase B (post-init attempt)
+        }
     }
 
 private:
     Api* api_ = nullptr;
     JNIEnv* env_ = nullptr;
+    std::string androidId_;
 };
 
 REGISTER_ZYGISK_MODULE(OpenSpoof)

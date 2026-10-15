@@ -294,6 +294,14 @@ function render() {
         <div class="row"><span class="prof grow">Cell Tower CID</span>
           <input data-nh="cell-cid" value="${esc(nh.location?.cid || "")}" placeholder="67890" style="width:180px"></div>
 
+        <div class="prof" style="margin-top:8px; color:#a78bfa">📺 Display &amp; App Behavior</div>
+        <div class="row"><span class="prof grow">Refresh rate (Hz, 30–480)</span>
+          <input data-nh="refresh-rate" type="number" value="${esc(nh.refresh_rate_hz ?? "")}" placeholder="120" style="width:180px"></div>
+        <div class="row"><span class="prof grow">Language (BCP-47)</span>
+          <input data-nh="language" value="${esc(nh.language || "")}" placeholder="en-US" style="width:180px"></div>
+        <div class="row"><span class="prof grow">Disable FLAG_SECURE (screenshot bypass)</span>
+          <input data-nh="flag-secure" type="checkbox" ${nh.disable_flag_secure ? "checked" : ""}></div>
+
         <div class="prof" style="margin-top:8px; color:#9a9ab0">⏱️ Low-level System &amp; Uptime</div>
         <div class="row"><span class="prof grow">Uptime offset (seconds)</span>
           <input data-nh="uptime" type="number" value="${esc(nh.uptime_offset_sec ?? "")}" placeholder="0" style="width:180px"></div>
@@ -418,6 +426,22 @@ function render() {
       nh.uname.sysname = e.target.value.trim();
       if (!nh.uname.sysname) delete nh.uname.sysname;
     });
+    // GAP #16: refresh rate override (Hz). Empty -> field removed.
+    onch('[data-nh="refresh-rate"]', e => {
+      const v = parseInt(e.target.value, 10);
+      if (isNaN(v) || v === 0) delete nh.refresh_rate_hz;
+      else if (v >= 30 && v <= 480) nh.refresh_rate_hz = v;
+    });
+    // GAP #10: per-app language (BCP-47).
+    onch('[data-nh="language"]', e => {
+      const v = e.target.value.trim();
+      if (!v) delete nh.language; else nh.language = v;
+    });
+    // GAP #7: FLAG_SECURE bypass (boolean).
+    onch('[data-nh="flag-secure"]', e => {
+      if (e.target.checked) nh.disable_flag_secure = true;
+      else delete nh.disable_flag_secure;
+    });
 
     const propsBox = q('[data-props]');
     const renderProps = () => {
@@ -506,7 +530,8 @@ document.getElementById("save").onclick = async () => {
       if (nh.location && nh.location.latitude === undefined && nh.location.longitude === undefined && !nh.location.lac && !nh.location.cid) delete nh.location;
 
       const hasAny = nh.uptime_offset_sec || nh.uname || (nh.props && Object.keys(nh.props).length) ||
-                     nh.gpu || nh.telephony || nh.id || nh.drm || nh.location;
+                     nh.gpu || nh.telephony || nh.id || nh.drm || nh.location ||
+                     nh.refresh_rate_hz || nh.language || nh.disable_flag_secure;
       if (!hasAny) delete p.native_hooks;
     }
     // Atomic write: base64 -> tmp -> mv

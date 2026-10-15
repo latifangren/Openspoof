@@ -86,12 +86,24 @@ struct NativeHooks {
     IdentifierConfig id;                       // Phase B: Android ID, MAC, GAID
     DrmConfig drm;                             // Phase C: DRM & Widevine
     LocationConfig location;                   // Phase C: GPS & Cell Tower
+    int refreshRateHz = 0;                     // GAP #16: display refresh rate (0 = off)
+    bool disableFlagSecure = false;            // GAP #7: per-app FLAG_SECURE bypass
+                                              //   (runtime hook is F5 work; the
+                                              //   config + sentinel are staged now so
+                                              //   the WebUI and policy code can use
+                                              //   the same schema once F5 lands)
+    std::string languageTag;                   // GAP #10: per-app BCP-47 locale
+                                              //   (e.g. "en-US", "pt-BR", "zh-Hans-CN").
+                                              //   System property spoof only; for full
+                                              //   per-app resource resolution we
+                                              //   also need an ART hook on Locale.
 
     bool enabled() const {
         return uptimeOffsetSec != 0 || !unameMachine.empty() ||
                !unameSysname.empty() || !props.empty() || gpu.enabled() ||
                telephony.enabled() || id.enabled() || drm.enabled() ||
-               location.enabled();
+               location.enabled() || refreshRateHz > 0 ||
+               disableFlagSecure || !languageTag.empty();
     }
 };
 
@@ -249,6 +261,39 @@ inline void fillProfile(Profile& p, const Value& obj) {
         if (pr != o.object.end() && pr->second.isObject) {
             for (const auto& kv : pr->second.object) {
                 if (!kv.second.isObject) p.nativeHooks.props[kv.first] = kv.second.str;
+            }
+        }
+        // GAP #16: refresh rate override. Sanity-checked to a
+        // sensible range so a typo cannot produce a nonsense value.
+        {
+            std::string rr = get(o, "refresh_rate_hz");
+            if (!rr.empty()) {
+                try {
+                    int v = std::stoi(rr);
+                    if (v >= 30 && v <= 480) p.nativeHooks.refreshRateHz = v;
+                } catch (...) {}
+            }
+        }
+        // GAP #7: FLAG_SECURE bypass. The boolean is parsed but
+        // not yet acted on at runtime — see hooks.cpp notes. Setting
+        // it lets the WebUI / config schema commit the toggle now
+        // so that F5 work only needs to read the same field.
+        {
+            auto fs = o.object.find("disable_flag_secure");
+            if (fs != o.object.end() && !fs->second.isObject) {
+                std::string v = fs->second.str;
+                p.nativeHooks.disableFlagSecure = (v == "1" || v == "true" || v == "TRUE");
+            }
+        }
+        // GAP #10: per-app language (BCP-47). System property
+        // spoof only — see hooks.cpp for the runtime path. We
+        // accept the field and validate it lightly: must not be
+        // empty, no spaces (BCP-47 forbids them), and a sane
+        // length cap.
+        {
+            std::string lang = get(o, "language");
+            if (!lang.empty() && lang.size() <= 35 && lang.find(' ') == std::string::npos) {
+                p.nativeHooks.languageTag = lang;
             }
         }
         auto gpuObj = o.object.find("gpu");

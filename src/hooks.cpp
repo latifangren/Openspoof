@@ -24,6 +24,7 @@
 
 #ifdef HAVE_DOBBY
 #include <dlfcn.h>
+#include <fcntl.h>
 #include <string.h>
 #include <time.h>
 #include <stdint.h>
@@ -357,8 +358,23 @@ bool InstallNativeHooks(const NativeHooks& h) {
         g_props["persist.sys.advertising_id"] = h.id.gaid;
     }
 
+    // GAP #16: Display refresh rate override. A handful of system
+    // properties are read by DisplayManager / SurfaceFlinger when
+    // deciding what Hz to advertise. Both the persist and ro
+    // variants are seeded so callers that look at either path get
+    // the same answer.
+    if (h.refreshRateHz > 0) {
+        std::string rr = std::to_string(h.refreshRateHz);
+        g_props["persist.sys.display.refresh_rate"] = rr;
+        g_props["ro.surface_flinger.refresh_rate"] = rr;
+        // Some apps read these directly via __system_property_get.
+        // The F4c hook below will see them through g_props.
+    }
+
     // F4c: __system_property_get and __system_property_read_callback (modern Android)
-    if (!h.props.empty() || h.telephony.enabled() || h.location.enabled() || (h.id.enabled() && !h.id.gaid.empty())) {
+    if (!h.props.empty() || h.telephony.enabled() || h.location.enabled() ||
+        (h.id.enabled() && !h.id.gaid.empty()) || h.refreshRateHz > 0 ||
+        !h.languageTag.empty()) {
         for (const auto& kv : h.props) {
             g_props[kv.first] = kv.second;
         }
@@ -373,6 +389,39 @@ bool InstallNativeHooks(const NativeHooks& h) {
         g_mac_address = h.id.macAddress;
         any |= hookOne("libc.so", "ioctl", (void*)fake_ioctl,
                        (void**)&orig_ioctl, "ioctl (SIOCGIFHWADDR)");
+    }
+
+    // GAP #7: Disable FLAG_SECURE. A real bypass requires an ART /
+    // Java method hook on android.view.Window.setFlags, which is F5
+    // work. For now we mark the request in the config schema, log
+    // a clear "not yet implemented" line, and write a sentinel file
+    // so a future F5 build can pick up the intent without the user
+    // reconfiguring. The sentinel lives under /data/adb/modules
+    // because /data/system is SELinux-restricted on most ROMs.
+    if (h.disableFlagSecure) {
+        LOGD("disable_flag_secure requested; runtime hook is F5 work, "
+             "writing sentinel only");
+        const char* sentinel = "/data/adb/modules/openspoof/.flag_secure_pending";
+        int fd = open(sentinel, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd >= 0) close(fd);
+    }
+
+    // GAP #10: Per-app language. We poison the system properties
+    // that Locale.getDefault() and a handful of native readers
+    // consult. Apps that read the locale from a Configuration
+    // object held in the system_server process will not see this
+    // change without an ART hook (F5 work); the property path
+    // covers the Java-side reading that uses Locale.getDefault().
+    if (!h.languageTag.empty()) {
+        // BCP-47 uses '-' as separator; the legacy POSIX form uses
+        // '_'. Some Java APIs expose the legacy form, so we seed
+        // both. The current Android emulator and most apps read
+        // the BCP-47 form.
+        g_props["persist.sys.locale"] = h.languageTag;
+        g_props["ro.product.locale"] = h.languageTag;
+        std::string legacy = h.languageTag;
+        for (auto& c : legacy) if (c == '-') c = '_';
+        g_props["ro.product.locale.language"] = legacy;
     }
 
     // F4e & F4f: GPU Spoofing (OpenGL, EGL, Vulkan)

@@ -61,7 +61,42 @@
           "machine": "aarch64",
           "sysname": "Linux"
         },
-        "uptime_offset_sec": 172800
+        "uptime_offset_sec": 172800,
+        "refresh_rate_hz": 144,
+        "language": "en-US"
+      }
+    },
+    "redmagic_10_pro": {
+      "BOARD": "pineapple",
+      "BRAND": "nubia",
+      "DEVICE": "NX789J",
+      "DISPLAY": "NX789J_UNCommon_10.0.1",
+      "FINGERPRINT": "nubia/NX789J/NX789J:15/AP3A.241105.008/20241121.000000:user/release-keys",
+      "HARDWARE": "qcom",
+      "ID": "AP3A.241105.008",
+      "INCREMENTAL": "20241121.000000",
+      "MANUFACTURER": "ZTE",
+      "MODEL": "NX789J",
+      "PRODUCT": "NX789J",
+      "RELEASE": "15",
+      "SDK_INT": 35,
+      "SECURITY_PATCH": "2024-11-05",
+      "native_hooks": {
+        "gpu": {
+          "vendor": "Qualcomm",
+          "renderer": "Adreno (TM) 830",
+          "version": "OpenGL ES 3.2 V@0830.0"
+        },
+        "id": {
+          "android_id": "a1b2c3d4e5f60718"
+        },
+        "props": {
+          "ro.product.brand": "nubia",
+          "ro.product.model": "NX789J"
+        },
+        "refresh_rate_hz": 165,
+        "language": "zh-Hans-CN",
+        "disable_flag_secure": true
       }
     },
     "pixel_9_pro": {

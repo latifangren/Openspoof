@@ -60,6 +60,10 @@ build_abi() { # $1 triple-prefix, $2 zygisk dir name
   local strip="$TOOL/llvm-strip$exe"
 
   local dobby_lib="$(get_dobby_lib "$2")"
+  local abi_dobby_flags=""
+  if [ -n "$dobby_lib" ]; then
+    abi_dobby_flags="$DOBBY_FLAGS"
+  fi
 
   if [ ! -x "$cxx" ] && [ ! -f "$cxx" ]; then
     echo "compiler not found: $cxx"; return 1
@@ -68,7 +72,7 @@ build_abi() { # $1 triple-prefix, $2 zygisk dir name
   echo "building $2 (dobby: ${dobby_lib:-none})..."
   mkdir -p module/zygisk
   "$cxx" -std=c++17 -shared -fPIC -O2 -ffunction-sections -fdata-sections \
-    -Wl,--gc-sections $DOBBY_FLAGS -I src \
+    -Wl,--gc-sections $abi_dobby_flags -I src \
     src/spoof.cpp src/hooks.cpp src/f5_art_hooks.cpp \
     ${dobby_lib:+$dobby_lib} -llog -o "module/zygisk/$2.so"
   "$strip" --strip-unneeded "module/zygisk/$2.so"

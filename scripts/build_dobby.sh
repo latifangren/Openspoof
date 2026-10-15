@@ -14,7 +14,10 @@ cd "$REPO"
 ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-}}"
 : "${ANDROID_NDK_HOME:?set ANDROID_NDK_HOME or ANDROID_NDK_ROOT to your NDK path}"
 
-ABIS=("arm64-v8a" "armeabi-v7a" "x86_64")
+# arm64-v8a (production Android) and x86_64 (emulators) are fully supported.
+# armeabi-v7a (32-bit ARM) is unsupported by modern Dobby upstream; scripts/build.sh
+# safely builds armeabi-v7a with no-op hooks when libdobby.a is not present.
+ABIS=("arm64-v8a" "x86_64")
 
 GEN_ARG=""
 if command -v ninja >/dev/null 2>&1; then

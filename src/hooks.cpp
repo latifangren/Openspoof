@@ -227,7 +227,11 @@ void* fake_eglGetProcAddress(const char* procname) {
 
 static void (*orig_vkGetPhysicalDeviceProperties)(void*, void*) = nullptr;
 
+#ifdef OPENSPOOF_HAS_VULKAN_H
+VKAPI_ATTR void VKAPI_CALL fake_vkGetPhysicalDeviceProperties(void* physicalDevice, void* pProperties) {
+#else
 void fake_vkGetPhysicalDeviceProperties(void* physicalDevice, void* pProperties) {
+#endif
     if (orig_vkGetPhysicalDeviceProperties != nullptr) {
         orig_vkGetPhysicalDeviceProperties(physicalDevice, pProperties);
     }
@@ -255,10 +259,25 @@ void fake_vkGetPhysicalDeviceProperties(void* physicalDevice, void* pProperties)
     }
 }
 
+#ifdef OPENSPOOF_HAS_VULKAN_H
+static PFN_vkGetInstanceProcAddr orig_vkGetInstanceProcAddr = nullptr;
+
+static PFN_vkVoidFunction VKAPI_CALL fake_vkGetInstanceProcAddr(VkInstance instance, const char* pName) {
+    if (pName != nullptr) {
+        if (strcmp(pName, "vkGetPhysicalDeviceProperties") == 0) {
+            return reinterpret_cast<PFN_vkVoidFunction>(fake_vkGetPhysicalDeviceProperties);
+        }
+    }
+    if (orig_vkGetInstanceProcAddr != nullptr) {
+        return orig_vkGetInstanceProcAddr(instance, pName);
+    }
+    return nullptr;
+}
+#else
 typedef void* (*PFN_vkGetInstanceProcAddr)(void* instance, const char* pName);
 static PFN_vkGetInstanceProcAddr orig_vkGetInstanceProcAddr = nullptr;
 
-void* fake_vkGetInstanceProcAddr(void* instance, const char* pName) {
+static void* fake_vkGetInstanceProcAddr(void* instance, const char* pName) {
     if (pName != nullptr) {
         if (strcmp(pName, "vkGetPhysicalDeviceProperties") == 0) {
             return (void*)fake_vkGetPhysicalDeviceProperties;
@@ -269,6 +288,7 @@ void* fake_vkGetInstanceProcAddr(void* instance, const char* pName) {
     }
     return nullptr;
 }
+#endif
 
 // Helper: look up symbol in process or try explicitly loading companion library
 void* findSymbol(const char* libname, const char* sym) {

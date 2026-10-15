@@ -7,6 +7,7 @@
 #include "core/assembler/assembler.h"
 
 #include "MemoryAllocator/CodeMemBuffer.h"
+typedef CodeMemBuffer CodeBuffer;
 
 enum ref_label_type_t { kLdrLiteral };
 
@@ -183,16 +184,22 @@ enum ExecuteState { ARMExecuteState, ThumbExecuteState };
 class Assembler : public AssemblerBase {
 private:
   ExecuteState execute_state_;
+  CodeBuffer *buffer_;
 
 public:
-  Assembler(void *address) : AssemblerBase(address) {
+  Assembler(addr_t address) : AssemblerBase(address) {
     execute_state_ = ARMExecuteState;
-    buffer_ = new CodeBuffer();
+    buffer_ = &code_buffer_;
+  }
+
+  Assembler(void *address) : AssemblerBase((addr_t)address) {
+    execute_state_ = ARMExecuteState;
+    buffer_ = &code_buffer_;
   }
 
   // shared_ptr is better choice
   // but we can't use it at kernelspace
-  Assembler(void *address, CodeBuffer *buffer) : AssemblerBase(address) {
+  Assembler(void *address, CodeBuffer *buffer) : AssemblerBase((addr_t)address) {
     execute_state_ = ARMExecuteState;
     buffer_ = buffer;
   }
@@ -211,7 +218,7 @@ public:
 
   void SetRealizedAddress(void *address) {
     DCHECK_EQ(0, reinterpret_cast<uint64_t>(address) % 4);
-    AssemblerBase::SetRealizedAddress(address);
+    set_fixed_addr((addr_t)address);
   }
 
   void EmitARMInst(arm_inst_t instr);

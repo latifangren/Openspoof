@@ -4,7 +4,6 @@
 # Build Outputs & Packaging
 openspoof-*.zip
 module/zygisk/
-src/zygisk.hpp
 
 # OS & Editor
 .DS_Store

@@ -73,11 +73,19 @@ jobs:
           NDK_CLANG="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++"
           echo "Using NDK clang: $NDK_CLANG"
           ls -la "$NDK_CLANG" || true
+          if [ ! -f src/zygisk.hpp ]; then
+            echo "fetching zygisk.hpp..."
+            curl -sL -o src/zygisk.hpp \
+              https://raw.githubusercontent.com/topjohnwu/zygisk-module-sample/master/module/jni/zygisk.hpp
+          fi
+          DOBBY_FLAGS=""
+          if [ -d "third_party/dobby/include" ]; then
+            DOBBY_FLAGS="-DHAVE_DOBBY -Ithird_party/dobby/include"
+          fi
           "$NDK_CLANG" -fsyntax-only -std=c++17 -Wall -Wextra \
-            -I src \
+            $DOBBY_FLAGS -I src \
             --target=x86_64-linux-android21 \
             --sysroot="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/sysroot" \
-            -D__ANDROID_API__=21 \
             src/spoof.cpp src/hooks.cpp src/f5_art_hooks.cpp 2>&1 | tee cxx-syntax.log
 
       # Lint the shell scripts that ship in module/, scripts/, and tests/.

@@ -68,6 +68,70 @@ and the project does not yet adhere to Semantic Versioning — see
   "validated on device". The verification checklist in
   `ROADMAP.md` § 5 is the gate for v1.0.0.
 
+### Added (post-REFERENCE-COPG.md)
+- **CI maturity pass.** New `release.yml` workflow that publishes
+  a GitHub Release on tag push, extracting notes from
+  `docs/CHANGELOG.md`. `build.yml` now caches the NDK install,
+  runs shellcheck on every shipped shell script, runs a
+  host-clang `-fsyntax-only` pass on the C++ sources with the
+  NDK sysroot include path, and runs the test runner before
+  the build. `scripts/build_dobby.sh` now builds Dobby for all
+  three shipped ABIs (arm64-v8a, armeabi-v7a, x86_64) instead
+  of just arm64.
+- **Device and CPU catalogs.** `module/devices.conf` extended
+  from 5 to 18 device entries (added oneplus_12, xiaomi_14_pro,
+  iqoo_12_pro, redmagic_10_pro, honor_magic7_pro,
+  pixel_9_pro_xl, pixel_9, pixel_8a, pixel_7_pro,
+  galaxy_s25_ultra, galaxy_s24_plus). New
+  `module/cpu_profiles.conf` with 11 SoCs. New
+  `module/cpuinfo/cpuinfo_sd8elite` (Snapdragon 8 Elite sample
+  for the F2 bind-mount path). WebUI now iterates
+  `DEVICE_PRESETS` and the new `CPU_PRESETS` map at render
+  time, so adding a new entry is a JS-only edit.
+- **GAP #16 — display refresh rate.** New
+  `NativeHooks::refreshRateHz` (validated 30..480 Hz) plus
+  the JSON parser entry `native_hooks.refresh_rate_hz`. At
+  runtime the value is seeded into
+  `persist.sys.display.refresh_rate` and
+  `ro.surface_flinger.refresh_rate` so the per-app Display /
+  SurfaceFlinger path reports the spoofed Hz.
+- **GAP #10 — per-app language.** New
+  `NativeHooks::languageTag` (BCP-47, validated for non-space
+  and length). Property layer seeds
+  `persist.sys.locale`, `ro.product.locale`, and the legacy
+  `ro.product.locale.language` form. Phase 5 layer (see
+  below) additionally calls `Locale.setDefault` for in-process
+  readers.
+- **GAP #7 — Disable FLAG_SECURE.** New
+  `NativeHooks::disableFlagSecure` (boolean). Phase 5 layer
+  replaces `android.view.Window.setFlags` via JNI
+  `RegisterNatives`, so FLAG_SECURE on a target app's window
+  is dropped at runtime. With Phase 5 the GAP moves from
+  "sentinel only" to "real effect".
+- **Phase 5 ART hooks.** New `src/f5_art_hooks.cpp` with two
+  JNI-only helpers (no Dobby, no execmem, no SELinux work
+  needed):
+  `InstallFlagSecureHookF5(JNIEnv*)` and
+  `ApplyLocaleOverrideF5(JNIEnv*, const std::string& tag)`.
+  Both clear pending JNI exceptions and return false on
+  failure (class not loaded, register failed), so a
+  misconfiguration never crashes the app.
+- **Tests.** New `tests/test_config_parser.cpp` (C++ unit test
+  for the JSON parser: refresh_rate_hz in-range and
+  out-of-range, disable_flag_secure default and explicit,
+  language with and without space, combined profile with
+  all three new features). New `tests/test_f5_link.cpp`
+  (symbol-presence check for the two public F5 entry
+  points). `tests/run.sh` now discovers and builds
+  `tests/test_*.cpp` files with host clang++; it skips with
+  a clear notice if the compiler is not on PATH.
+
+### Fixed
+- Build script: the multi-ABI Dobby build now produces
+  `libdobby.a` for all three ABIs, fixing the
+  armeabi-v7a and x86_64 link failures that would have
+  surfaced on first non-arm64 packaging.
+
 ## [v0.1.0] — initial skeleton
 
 - Phase 1: JNI `Build` field spoofing.

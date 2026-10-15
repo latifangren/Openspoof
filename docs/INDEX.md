@@ -48,6 +48,7 @@ Every other doc links back here so you can navigate by topic.
 | [SPEC.md](SPEC.md)                 | Contract: what OpenSpoof is and isn't      | Users & devs   |
 | [ROADMAP.md](ROADMAP.md)           | Phases, status, gap analysis, checklist    | Maintainers    |
 | [PHASE4.md](PHASE4.md)             | Native hook engine (Dobby) details         | Hook authors   |
+| [REFERENCE-COPG.md](REFERENCE-COPG.md) | Maintainer's static audit of COPG v7.5.1 | Reference     |
 | [CHANGELOG.md](CHANGELOG.md)       | Release notes per version                  | Users & devs   |
 
 ## Document hierarchy

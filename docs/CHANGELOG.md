@@ -12,6 +12,12 @@ and the project does not yet adhere to Semantic Versioning — see
 ## [Unreleased]
 
 ### Added
+- `docs/REFERENCE-COPG.md` — maintainer's static audit of
+  `COPG-v7.5.1.zip` (SHA-256 confirmed against the public REA at
+  `latifangren/SkySpoof/docs/REA-ANALYSIS.md`). Documents the
+  per-feature sentinel-file pattern, `libmicshare`'s
+  `libaudioflinger` hook for Concurrent Mic, and the
+  `__dl_dlopen` wrapper used as an anti-detection trick.
 - `docs/INDEX.md` — single document map; replaces ad-hoc cross-links.
 - `docs/CHANGELOG.md` — this file.
 - `LICENSE` — MIT license (project was previously unlicensed despite the

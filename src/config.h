@@ -416,14 +416,10 @@ inline void fillProfile(Profile& p, const Value& obj) {
 
 }  // namespace openspoof_json
 
-inline Config LoadConfig(const std::string& path) {
+inline Config LoadConfigFromString(const std::string& json) {
     Config cfg;
-    std::ifstream f(path);
-    if (!f) return cfg;
-    std::stringstream ss;
-    ss << f.rdbuf();
     openspoof_json::Value root;
-    openspoof_json::Parser parser(ss.str());
+    openspoof_json::Parser parser(json);
     if (!parser.parse(root)) return cfg;
 
     auto pit = root.object.find("profiles");
@@ -441,17 +437,21 @@ inline Config LoadConfig(const std::string& path) {
             if (!kv.second.isObject) cfg.apps[kv.first] = kv.second.str;
         }
     }
-    // version_policy: never | rom | force. Default rom. We accept
-    // any case and surrounding whitespace; unknown values fall back
-    // to rom rather than erroring out (a bad policy should not
-    // brick the module).
     auto vit = root.object.find("version_policy");
     if (vit != root.object.end() && !vit->second.isObject) {
         std::string v = vit->second.str;
         for (auto& c : v) c = (char)std::tolower((unsigned char)c);
         if      (v == "never") cfg.versionPolicy = VersionPolicy::Never;
         else if (v == "force") cfg.versionPolicy = VersionPolicy::Force;
-        else                    cfg.versionPolicy = VersionPolicy::Rom;
+        else                   cfg.versionPolicy = VersionPolicy::Rom;
     }
     return cfg;
+}
+
+inline Config LoadConfig(const std::string& path) {
+    std::ifstream f(path);
+    if (!f) return Config();
+    std::stringstream ss;
+    ss << f.rdbuf();
+    return LoadConfigFromString(ss.str());
 }

@@ -14,8 +14,12 @@ set_perm() {
 
 # config.json must survive updates: keep the user's existing one
 if [ -f "/data/adb/modules/openspoof/config.json" ] && [ "$MODPATH" != "/data/adb/modules/openspoof" ]; then
-  ui_print "- Keeping existing config.json"
-  cp -f "/data/adb/modules/openspoof/config.json" "$MODPATH/config.json.bak"
+  if grep -q '"BRAND"' "/data/adb/modules/openspoof/config.json" 2>/dev/null; then
+    ui_print "- Keeping valid existing config.json"
+    cp -f "/data/adb/modules/openspoof/config.json" "$MODPATH/config.json.bak"
+  else
+    ui_print "- Existing config.json is empty/invalid, using default template"
+  fi
 fi
 
 set_perm "$MODPATH/zygisk/arm64-v8a.so" 0 0 0644 2>/dev/null || true

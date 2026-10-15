@@ -17,6 +17,7 @@
 // zygisk.hpp is fetched at build time from topjohnwu/zygisk-module-sample.
 
 #include <dlfcn.h>
+#include <fcntl.h>
 #include <fstream>
 #include <jni.h>
 #include <sched.h>
@@ -34,7 +35,7 @@
 #include "config.h"
 #include "hooks.h"
 
-#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "OpenSpoof", __VA_ARGS__)
+#define LOGD(...) __android_log_print(ANDROID_LOG_INFO, "OpenSpoof", __VA_ARGS__)
 #define MODULE_DIR "/data/adb/modules/openspoof"
 
 using zygisk::Api;
@@ -379,6 +380,7 @@ public:
     void onLoad(Api* api, JNIEnv* env) override {
         api_ = api;
         env_ = env;
+        LOGD("OpenSpoof module loaded via Zygisk in process (PID %d)", getpid());
     }
 
     void preAppSpecialize(AppSpecializeArgs* args) override {
@@ -386,7 +388,33 @@ public:
         std::string process = raw ? raw : "";
         if (raw) env_->ReleaseStringUTFChars(args->nice_name, raw);
 
-        Config cfg = LoadConfig(MODULE_DIR "/config.json");
+        LOGD("preAppSpecialize: process='%s'", process.c_str());
+
+        Config cfg;
+        int mod_dfd = api_->getModuleDir();
+        if (mod_dfd >= 0) {
+            int fd = openat(mod_dfd, "config.json", O_RDONLY | O_CLOEXEC);
+            if (fd >= 0) {
+                std::string content;
+                char buf[1024];
+                ssize_t n;
+                while ((n = read(fd, buf, sizeof(buf))) > 0) {
+                    content.append(buf, n);
+                }
+                close(fd);
+                cfg = LoadConfigFromString(content);
+            }
+        }
+        if (cfg.profiles.empty() && cfg.apps.empty()) {
+            cfg = LoadConfig(MODULE_DIR "/config.json");
+        }
+
+        if (cfg.profiles.empty() && cfg.apps.empty()) {
+            LOGD("config.json missing, empty or unreadable; unloading from %s", process.c_str());
+            api_->setOption(zygisk::Option::DLCLOSE_MODULE_LIBRARY);
+            return;
+        }
+
         auto it = cfg.apps.find(process);
         if (it == cfg.apps.end()) {
             it = cfg.apps.find("*");
@@ -410,7 +438,8 @@ public:
         }
         const Profile* p = cfg.findProfile(it->second);
         if (p == nullptr) {
-            LOGD("profile '%s' not found, skipping %s", it->second.c_str(), process.c_str());
+            LOGD("profile '%s' not found for '%s', unloading", it->second.c_str(), process.c_str());
+            api_->setOption(zygisk::Option::DLCLOSE_MODULE_LIBRARY);
             return;
         }
         androidId_ = p->nativeHooks.id.androidId;
@@ -422,8 +451,9 @@ public:
         spoofBuild(env_, *p, cfg.versionPolicy);  // Phase 1 + version policy
         spoofAndroidId(env_, androidId_); // Phase B (early attempt)
         installMediaDrmHook(env_, drm_);  // Phase C (early attempt)
-        openspoof::InstallNativeHooks(p->nativeHooks);  // Phase 4 & PRO
-        LOGD("spoofed %s as profile '%s'", process.c_str(), it->second.c_str());
+        openspoof::InstallNativeHooks(p->nativeHooks, p);  // Phase 4 & PRO + native system props
+        LOGD("SUCCESS: spoofed '%s' as profile '%s' (Model: %s, Brand: %s)",
+             process.c_str(), it->second.c_str(), p->model.c_str(), p->brand.c_str());
     }
 
     void postAppSpecialize(const AppSpecializeArgs*) override {

@@ -694,9 +694,22 @@
         cfg = JSON.parse(raw);
         cfg.profiles ||= {};
         cfg.apps ||= {};
-        showToast("Konfigurasi berhasil dimuat", "ok");
       } catch (e) {
-        showToast("Config kosong atau gagal dibaca: " + e.message, "err");
+        showToast("Menginisialisasi konfigurasi...", "ok");
+      }
+
+      // Auto-seed default profiles if profiles is empty so user never starts with blank state!
+      const profKeys = Object.keys(cfg.profiles);
+      if (profKeys.length === 0) {
+        for (const seedKey of ["redmagic_10_pro", "rog_phone_8_pro", "galaxy_s25_ultra", "pixel_9_pro_xl"]) {
+          if (DEVICE_PRESETS[seedKey]) {
+            cfg.profiles[seedKey] = { native_hooks: {} };
+            applyPresetToProfile(cfg.profiles[seedKey], seedKey);
+          }
+        }
+        activeProfileKey = "redmagic_10_pro";
+      } else if (!activeProfileKey || !cfg.profiles[activeProfileKey]) {
+        activeProfileKey = profKeys[0];
       }
 
       initPresetPickers();
@@ -886,13 +899,13 @@
       const active = e.target.checked;
       const profKeys = Object.keys(cfg.profiles);
       if (active) {
-        const chosen = document.getElementById("globalProfileSelect").value || profKeys[0] || "default";
+        const chosen = document.getElementById("globalProfileSelect").value || activeProfileKey || profKeys[0] || "redmagic_10_pro";
         cfg.apps["*"] = chosen;
       } else {
         delete cfg.apps["*"];
       }
       renderAll();
-      showToast(active ? "Mode Global Aktif" : "Mode Global Dinonaktifkan", "ok");
+      showToast(active ? "Mode Global Aktif (" + cfg.apps["*"] + ")" : "Mode Global Dinonaktifkan", "ok");
     };
 
     document.getElementById("globalProfileSelect").onchange = (e) => {
@@ -925,10 +938,18 @@
     // Apply quick preset
     document.getElementById("presetPicker").onchange = (e) => {
       const k = e.target.value;
-      if (!k || !cfg.profiles[activeProfileKey]) return;
+      if (!k || !DEVICE_PRESETS[k]) return;
+      
+      // If no active profile, or active profile not in cfg.profiles, create one named after the preset!
+      if (!activeProfileKey || !cfg.profiles[activeProfileKey]) {
+        activeProfileKey = k;
+      }
+      if (!cfg.profiles[activeProfileKey]) {
+        cfg.profiles[activeProfileKey] = { native_hooks: {} };
+      }
       applyPresetToProfile(cfg.profiles[activeProfileKey], k);
-      renderProfileFields();
-      showToast("Preset " + DEVICE_PRESETS[k].label + " diterapkan", "ok");
+      renderAll();
+      showToast("Preset " + DEVICE_PRESETS[k].label + " diterapkan ke '" + activeProfileKey + "'", "ok");
     };
 
     // Apply CPU preset
@@ -947,10 +968,10 @@
       if (cfg.profiles[name]) return showToast("Profil sudah ada!", "err");
 
       cfg.profiles[name] = {
-        MANUFACTURER: "Google", MODEL: name, BRAND: "google",
-        DEVICE: name.toLowerCase(), PRODUCT: name.toLowerCase(), BOARD: name.toLowerCase(),
-        HARDWARE: name.toLowerCase(), FINGERPRINT: "google/" + name.toLowerCase() + "/" + name.toLowerCase() + ":14/UP1A.231005.007/1:user/release-keys",
-        SDK_INT: 34, RELEASE: "14", native_hooks: {}
+        MANUFACTURER: "nubia", MODEL: "NX789J", BRAND: "nubia",
+        DEVICE: "NX789J", PRODUCT: "NX789J", BOARD: "pineapple",
+        HARDWARE: "qcom", FINGERPRINT: "nubia/NX789J/NX789J:15/AP3A.241105.008/20241121.000000:user/release-keys",
+        SDK_INT: 35, RELEASE: "15", native_hooks: {}
       };
       document.getElementById("newProfName").value = "";
       activeProfileKey = name;
@@ -1095,7 +1116,8 @@
         const body = JSON.stringify(cfg, null, 2);
         const b64 = btoa(unescape(encodeURIComponent(body)));
         await exec("echo '" + b64 + "' | base64 -d > " + MOD + "/config.json.tmp && " +
-                  "mv " + MOD + "/config.json.tmp " + MOD + "/config.json && chmod 0644 " + MOD + "/config.json");
+                  "mv -f " + MOD + "/config.json.tmp " + MOD + "/config.json && chmod 0644 " + MOD + "/config.json && " +
+                  "cp -f " + MOD + "/config.json " + MOD + "/config.backup.json 2>/dev/null || true");
         showToast("Konfigurasi tersimpan! Buka ulang aplikasi target.", "ok");
       } catch (e) {
         showToast("Gagal menyimpan: " + e.message, "err");

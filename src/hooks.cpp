@@ -317,13 +317,79 @@ bool hookOne(const char* libname, const char* sym, void* replace, void** orig, c
     return true;
 }
 
+static void SeedProfileProps(const Profile& p) {
+    auto setProp = [](const char* name, const std::string& val) {
+        if (!val.empty()) g_props[name] = val;
+    };
+    if (!p.model.empty()) {
+        setProp("ro.product.model", p.model);
+        setProp("ro.product.odm.model", p.model);
+        setProp("ro.product.vendor.model", p.model);
+        setProp("ro.product.system.model", p.model);
+        setProp("ro.product.product.model", p.model);
+        setProp("ro.product.system_ext.model", p.model);
+    }
+    if (!p.brand.empty()) {
+        setProp("ro.product.brand", p.brand);
+        setProp("ro.product.odm.brand", p.brand);
+        setProp("ro.product.vendor.brand", p.brand);
+        setProp("ro.product.system.brand", p.brand);
+        setProp("ro.product.product.brand", p.brand);
+        setProp("ro.product.system_ext.brand", p.brand);
+    }
+    if (!p.manufacturer.empty()) {
+        setProp("ro.product.manufacturer", p.manufacturer);
+        setProp("ro.product.odm.manufacturer", p.manufacturer);
+        setProp("ro.product.vendor.manufacturer", p.manufacturer);
+        setProp("ro.product.system.manufacturer", p.manufacturer);
+        setProp("ro.product.product.manufacturer", p.manufacturer);
+        setProp("ro.product.system_ext.manufacturer", p.manufacturer);
+    }
+    if (!p.device.empty()) {
+        setProp("ro.product.device", p.device);
+        setProp("ro.product.odm.device", p.device);
+        setProp("ro.product.vendor.device", p.device);
+        setProp("ro.product.system.device", p.device);
+        setProp("ro.product.product.device", p.device);
+        setProp("ro.product.system_ext.device", p.device);
+    }
+    if (!p.product.empty()) {
+        setProp("ro.product.name", p.product);
+        setProp("ro.build.product", p.product);
+    }
+    if (!p.board.empty()) {
+        setProp("ro.product.board", p.board);
+        setProp("ro.board.platform", p.board);
+    }
+    if (!p.hardware.empty()) {
+        setProp("ro.hardware", p.hardware);
+    }
+    if (!p.fingerprint.empty()) {
+        setProp("ro.build.fingerprint", p.fingerprint);
+        setProp("ro.odm.build.fingerprint", p.fingerprint);
+        setProp("ro.vendor.build.fingerprint", p.fingerprint);
+        setProp("ro.system.build.fingerprint", p.fingerprint);
+        setProp("ro.product.build.fingerprint", p.fingerprint);
+        setProp("ro.system_ext.build.fingerprint", p.fingerprint);
+    }
+    if (!p.release.empty()) {
+        setProp("ro.build.version.release", p.release);
+    }
+    if (p.sdkInt > 0) {
+        setProp("ro.build.version.sdk", std::to_string(p.sdkInt));
+    }
+}
 #endif  // HAVE_DOBBY
 
 }  // namespace
 
-bool InstallNativeHooks(const NativeHooks& h) {
+
+bool InstallNativeHooks(const NativeHooks& h, const Profile* profile) {
 #ifdef HAVE_DOBBY
-    if (!h.enabled()) return false;
+    if (profile != nullptr) {
+        SeedProfileProps(*profile);
+    }
+    if (!h.enabled() && g_props.empty()) return false;
     bool any = false;
 
     // F4a: uptime
@@ -392,7 +458,7 @@ bool InstallNativeHooks(const NativeHooks& h) {
     }
 
     // F4c: __system_property_get and __system_property_read_callback (modern Android)
-    if (!h.props.empty() || h.telephony.enabled() || h.location.enabled() ||
+    if (!g_props.empty() || !h.props.empty() || h.telephony.enabled() || h.location.enabled() ||
         (h.id.enabled() && !h.id.gaid.empty()) || h.refreshRateHz > 0 ||
         !h.languageTag.empty()) {
         for (const auto& kv : h.props) {

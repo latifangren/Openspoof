@@ -27,7 +27,7 @@ struct JNIEnv;
 
 namespace openspoof {
 
-bool InstallNativeHooks(const NativeHooks& hooks);
+bool InstallNativeHooks(const NativeHooks& hooks, const Profile* profile = nullptr);
 
 // Phase 5 — ART-side hooks (GAP #7 FLAG_SECURE, GAP #10 Locale).
 // These are JNI-only and require a live JNIEnv. Call from

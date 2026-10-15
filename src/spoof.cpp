@@ -10,6 +10,7 @@
 // Build with the NDK: see scripts/build.sh
 // zygisk.hpp is fetched at build time from topjohnwu/zygisk-module-sample.
 
+#include <dlfcn.h>
 #include <jni.h>
 #include <sched.h>
 #include <sys/mount.h>

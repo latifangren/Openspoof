@@ -8,7 +8,8 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO"
 VERSION="${1:-0.1.0}"
 
-: "${ANDROID_NDK_HOME:?set ANDROID_NDK_HOME to your NDK path}"
+ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-}}"
+: "${ANDROID_NDK_HOME:?set ANDROID_NDK_HOME or ANDROID_NDK_ROOT to your NDK path}"
 
 # Detect host OS toolchain
 OS="$(uname -s 2>/dev/null | tr '[:upper:]' '[:lower:]' || echo 'linux')"
@@ -50,8 +51,13 @@ get_dobby_lib() { # $1 abi
 }
 
 build_abi() { # $1 triple-prefix, $2 zygisk dir name
-  local cxx="$TOOL/$1-linux-android$API-clang++"
-  [ "$1" = "armv7a" ] && cxx="$TOOL/armv7a-linux-androideabi$API-clang++"
+  local ext=""
+  [ "$HOST_TAG" = "windows-x86_64" ] && ext=".cmd"
+  local cxx="$TOOL/$1-linux-android$API-clang++$ext"
+  [ "$1" = "armv7a" ] && cxx="$TOOL/armv7a-linux-androideabi$API-clang++$ext"
+  local strip="$TOOL/llvm-strip"
+  [ "$HOST_TAG" = "windows-x86_64" ] && strip="$TOOL/llvm-strip.exe"
+
   local dobby_lib="$(get_dobby_lib "$2")"
 
   echo "building $2 (dobby: ${dobby_lib:-none})..."
@@ -59,7 +65,7 @@ build_abi() { # $1 triple-prefix, $2 zygisk dir name
   "$cxx" -std=c++17 -shared -fPIC -O2 -ffunction-sections -fdata-sections \
     -Wl,--gc-sections $DOBBY_FLAGS -I src src/spoof.cpp src/hooks.cpp \
     ${dobby_lib:+$dobby_lib} -llog -o "module/zygisk/$2.so"
-  "$TOOL/llvm-strip" --strip-unneeded "module/zygisk/$2.so"
+  "$strip" --strip-unneeded "module/zygisk/$2.so"
 }
 build_abi aarch64 arm64-v8a
 build_abi armv7a armeabi-v7a

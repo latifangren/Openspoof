@@ -20,19 +20,22 @@
   input, select, button { font-size: .95rem; padding: 9px 10px; border-radius: 9px;
     border: 1px solid #33334d; background: #1b1b28; color: inherit; }
   input { width: 100%; }
-  button { background: #4f46e5; border: none; color: #fff; white-space: nowrap; }
+  button { background: #4f46e5; border: none; color: #fff; white-space: nowrap; cursor: pointer; }
   button.danger { background: #7f1d1d; }
-  button:disabled { opacity: .5; }
+  button.sec { background: #27273a; border: 1px solid #3b3b55; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
   .prof { font-size: .8rem; color: #9a9ab0; }
   .prof b { color: #d4d4e8; }
   #log { white-space: pre-wrap; font-size: .78rem; color: #9a9ab0; margin-top: 14px;
          max-height: 160px; overflow-y: auto; }
   .ok { color: #4ade80; } .err { color: #f87171; }
+  details { margin-top: 8px; }
+  summary { cursor: pointer; user-select: none; }
 </style>
 </head>
 <body>
 <h1>OpenSpoof <span id="ver" class="prof"></span></h1>
-<div class="sub">Per-app device &amp; CPU spoofing. Relaunch an app after saving to apply.</div>
+<div class="sub">Per-app device &amp; hardware spoofing engine. Relaunch an app after saving to apply.</div>
 
 <h2>Assigned apps</h2>
 <div class="row">
@@ -43,7 +46,7 @@
 <h2>Add app</h2>
 <div class="card">
   <div class="row">
-    <input id="pkg" class="grow" list="pkgs" placeholder="package name (e.g. com.example.game)" />
+    <input id="pkg" class="grow" list="pkgs" placeholder="package name (e.g. com.tencent.ig)" />
     <datalist id="pkgs"></datalist>
     <select id="newProfile"></select>
   </div>
@@ -51,6 +54,21 @@
 </div>
 
 <h2>Profiles</h2>
+<div class="card" style="border-color:#3b3b55">
+  <div class="row">
+    <input id="newProfName" class="grow" placeholder="New profile name (e.g. s24_ultra)..." />
+    <select id="newProfPreset" style="max-width:200px">
+      <option value="">⚡ Custom (Blank)</option>
+      <option value="redmagic_9_pro">RedMagic 9 Pro</option>
+      <option value="rog_phone_8_pro">ROG Phone 8 Pro</option>
+      <option value="galaxy_s24_ultra">Galaxy S24 Ultra</option>
+      <option value="pixel_9_pro">Pixel 9 Pro</option>
+      <option value="pixel_8_pro">Pixel 8 Pro</option>
+    </select>
+    <button id="addProfBtn">+ Add Profile</button>
+  </div>
+</div>
+
 <div id="profiles"></div>
 
 <div class="row" style="margin-top:16px">
@@ -69,9 +87,72 @@ const log = (m, cls) => {
 };
 let cfg = { profiles: {}, apps: {} };
 
+const DEVICE_PRESETS = {
+  redmagic_9_pro: {
+    label: "RedMagic 9 Pro (Snapdragon 8 Gen 3)",
+    MANUFACTURER: "ZTE", MODEL: "NX769J", BRAND: "nubia", DEVICE: "NX769J", PRODUCT: "NX769J",
+    BOARD: "pineapple", HARDWARE: "qcom",
+    FINGERPRINT: "nubia/NX769J/NX769J:14/UKQ1.230917.001/20240813.173312:user/release-keys",
+    SDK_INT: 34, RELEASE: "14",
+    gpu: { vendor: "Qualcomm", renderer: "Adreno (TM) 750", version: "OpenGL ES 3.2 V@0750.0" }
+  },
+  rog_phone_8_pro: {
+    label: "ROG Phone 8 Pro (Snapdragon 8 Gen 3)",
+    MANUFACTURER: "asus", MODEL: "ASUS_AI2401_A", BRAND: "asus", DEVICE: "ASUS_AI2401_A", PRODUCT: "WW_AI2401",
+    BOARD: "pineapple", HARDWARE: "qcom",
+    FINGERPRINT: "asus/WW_AI2401/ASUS_AI2401_A:14/UKQ1.230924.001/34.1420.1420.426-0:user/release-keys",
+    SDK_INT: 34, RELEASE: "14",
+    gpu: { vendor: "Qualcomm", renderer: "Adreno (TM) 750", version: "OpenGL ES 3.2 V@0750.0" }
+  },
+  galaxy_s24_ultra: {
+    label: "Galaxy S24 Ultra (Snapdragon 8 Gen 3)",
+    MANUFACTURER: "samsung", MODEL: "SM-S928B", BRAND: "samsung", DEVICE: "e3q", PRODUCT: "e3qxxx",
+    BOARD: "pineapple", HARDWARE: "qcom",
+    FINGERPRINT: "samsung/e3qxxx/e3q:14/UP1A.231005.007/S928BXXU1AXCA:user/release-keys",
+    SDK_INT: 34, RELEASE: "14",
+    gpu: { vendor: "Qualcomm", renderer: "Adreno (TM) 750", version: "OpenGL ES 3.2 V@0750.0" }
+  },
+  pixel_9_pro: {
+    label: "Pixel 9 Pro (Tensor G4)",
+    MANUFACTURER: "Google", MODEL: "Pixel 9 Pro", BRAND: "google", DEVICE: "caiman", PRODUCT: "caiman",
+    BOARD: "caiman", HARDWARE: "caiman",
+    FINGERPRINT: "google/caiman/caiman:17/CP3A.260905.009/16091614:user/release-keys",
+    SDK_INT: 35, RELEASE: "17",
+    gpu: { vendor: "ARM", renderer: "Mali-G715 Immortalis-G715 MC10", version: "OpenGL ES 3.2 v1.r38p0-01eac0" }
+  },
+  pixel_8_pro: {
+    label: "Pixel 8 Pro (Tensor G3)",
+    MANUFACTURER: "Google", MODEL: "Pixel 8 Pro", BRAND: "google", DEVICE: "husky", PRODUCT: "husky",
+    BOARD: "husky", HARDWARE: "husky",
+    FINGERPRINT: "google/husky/husky:14/UD1A.230803.041/10808477:user/release-keys",
+    SDK_INT: 34, RELEASE: "14",
+    gpu: { vendor: "ARM", renderer: "Mali-G715 Immortalis-G715s MC10", version: "OpenGL ES 3.2 v1.r38p0-01eac0" }
+  }
+};
+
+function applyPresetToProfile(p, presetKey) {
+  const pr = DEVICE_PRESETS[presetKey];
+  if (!pr) return;
+  p.MANUFACTURER = pr.MANUFACTURER;
+  p.MODEL = pr.MODEL;
+  p.BRAND = pr.BRAND;
+  p.DEVICE = pr.DEVICE;
+  p.PRODUCT = pr.PRODUCT;
+  p.BOARD = pr.BOARD;
+  p.HARDWARE = pr.HARDWARE;
+  p.FINGERPRINT = pr.FINGERPRINT;
+  p.SDK_INT = pr.SDK_INT;
+  p.RELEASE = pr.RELEASE;
+  p.native_hooks ||= {};
+  p.native_hooks.gpu ||= {};
+  p.native_hooks.gpu.vendor = pr.gpu.vendor;
+  p.native_hooks.gpu.renderer = pr.gpu.renderer;
+  p.native_hooks.gpu.version = pr.gpu.version;
+}
+
 async function exec(cmd) {
   if (window.ksu && ksu.exec) return (await ksu.exec(cmd)).stdout;
-  throw new Error("no root bridge — open this page in KernelSU WebUI");
+  throw new Error("no root bridge — open this page in KernelSU / APatch WebUI");
 }
 const esc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
 
@@ -119,13 +200,56 @@ function render() {
     p.native_hooks ||= {};
     const nh = p.native_hooks;
     nh.uname ||= {}; nh.props ||= {}; nh.gpu ||= {};
+    nh.telephony ||= {}; nh.id ||= {}; nh.drm ||= {}; nh.location ||= {};
+
     const d = document.createElement("div");
     d.className = "card";
-    d.innerHTML = `<div class="row"><b class="grow">${esc(k)}</b></div>
-      <div class="prof">MODEL <b>${esc(p.MODEL || "-")}</b> · BRAND <b>${esc(p.BRAND || "-")}</b><br>
-      FINGERPRINT <b>${esc((p.FINGERPRINT || "-").slice(0, 60))}…</b><br>
-      Android <b>${esc(p.RELEASE || "-")}</b> (SDK <b>${esc(String(p.SDK_INT ?? "-"))}</b>)</div>
-      <details><summary class="prof">Native hooks &amp; PRO Spoof (advanced)</summary>
+    d.innerHTML = `
+      <div class="row">
+        <b class="grow" style="font-size:1.05rem">${esc(k)}</b>
+        <select data-apply-preset style="font-size:12px; padding:4px 8px; max-width:180px">
+          <option value="">⚡ Apply Preset...</option>
+          <option value="redmagic_9_pro">RedMagic 9 Pro</option>
+          <option value="rog_phone_8_pro">ROG Phone 8 Pro</option>
+          <option value="galaxy_s24_ultra">Galaxy S24 Ultra</option>
+          <option value="pixel_9_pro">Pixel 9 Pro</option>
+          <option value="pixel_8_pro">Pixel 8 Pro</option>
+        </select>
+        <button class="danger" data-del-profile style="padding:4px 10px; font-size:12px">Delete</button>
+      </div>
+      <div class="prof">
+        MODEL <b>${esc(p.MODEL || "-")}</b> · BRAND <b>${esc(p.BRAND || "-")}</b><br>
+        FINGERPRINT <b>${esc((p.FINGERPRINT || "-").slice(0, 55))}…</b><br>
+        Android <b>${esc(p.RELEASE || "-")}</b> (SDK <b>${esc(String(p.SDK_INT ?? "-"))}</b>)
+      </div>
+
+      <details>
+        <summary class="prof" style="margin-top:6px; color:#a5b4fc">⚙️ Edit Build Fields (Hardware Identity)</summary>
+        <div class="row"><span class="prof grow">MANUFACTURER</span>
+          <input data-bf="MANUFACTURER" value="${esc(p.MANUFACTURER || "")}" placeholder="Google" style="width:180px"></div>
+        <div class="row"><span class="prof grow">MODEL</span>
+          <input data-bf="MODEL" value="${esc(p.MODEL || "")}" placeholder="Pixel 9 Pro" style="width:180px"></div>
+        <div class="row"><span class="prof grow">BRAND</span>
+          <input data-bf="BRAND" value="${esc(p.BRAND || "")}" placeholder="google" style="width:180px"></div>
+        <div class="row"><span class="prof grow">DEVICE</span>
+          <input data-bf="DEVICE" value="${esc(p.DEVICE || "")}" placeholder="caiman" style="width:180px"></div>
+        <div class="row"><span class="prof grow">PRODUCT</span>
+          <input data-bf="PRODUCT" value="${esc(p.PRODUCT || "")}" placeholder="caiman" style="width:180px"></div>
+        <div class="row"><span class="prof grow">BOARD</span>
+          <input data-bf="BOARD" value="${esc(p.BOARD || "")}" placeholder="caiman" style="width:180px"></div>
+        <div class="row"><span class="prof grow">HARDWARE</span>
+          <input data-bf="HARDWARE" value="${esc(p.HARDWARE || "")}" placeholder="caiman" style="width:180px"></div>
+        <div class="row"><span class="prof grow">FINGERPRINT</span>
+          <input data-bf="FINGERPRINT" value="${esc(p.FINGERPRINT || "")}" placeholder="google/caiman/..." style="width:180px"></div>
+        <div class="row"><span class="prof grow">SDK_INT</span>
+          <input data-bf="SDK_INT" value="${esc(p.SDK_INT ?? "")}" placeholder="35" style="width:180px"></div>
+        <div class="row"><span class="prof grow">RELEASE</span>
+          <input data-bf="RELEASE" value="${esc(p.RELEASE || "")}" placeholder="17" style="width:180px"></div>
+      </details>
+
+      <details>
+        <summary class="prof" style="margin-top:6px; color:#38bdf8">🎮 Native Hooks &amp; PRO Hardware Spoof</summary>
+        
         <div class="prof" style="margin-top:8px; color:#38bdf8">🎮 GPU Spoofing (OpenGL / Vulkan)</div>
         <div class="row"><span class="prof grow">GPU Renderer</span>
           <input data-nh="gpu-renderer" value="${esc(nh.gpu?.renderer || "")}" placeholder="Adreno (TM) 750" style="width:180px"></div>
@@ -133,6 +257,7 @@ function render() {
           <input data-nh="gpu-vendor" value="${esc(nh.gpu?.vendor || "")}" placeholder="Qualcomm" style="width:180px"></div>
         <div class="row"><span class="prof grow">GLES Version</span>
           <input data-nh="gpu-version" value="${esc(nh.gpu?.version || "")}" placeholder="OpenGL ES 3.2 V@0750.0" style="width:180px"></div>
+
         <div class="prof" style="margin-top:8px; color:#a78bfa">📱 Identity &amp; Telephony (PRO Tier)</div>
         <div class="row"><span class="prof grow">Android ID</span>
           <input data-nh="android-id" value="${esc(nh.id?.android_id || "")}" placeholder="16-hex digits" style="width:180px"></div>
@@ -146,6 +271,7 @@ function render() {
           <input data-nh="sim-name" value="${esc(nh.telephony?.sim_operator_name || "")}" placeholder="T-Mobile" style="width:180px"></div>
         <div class="row"><span class="prof grow">Google Ad ID (GAID)</span>
           <input data-nh="gaid" value="${esc(nh.id?.gaid || "")}" placeholder="a1b2c3d4-e5f6-..." style="width:180px"></div>
+
         <div class="prof" style="margin-top:8px; color:#f43f5e">🎬 Widevine / DRM (PRO Tier)</div>
         <div class="row"><span class="prof grow">Security Level</span>
           <select data-nh="drm-sec" style="width:180px">
@@ -157,31 +283,65 @@ function render() {
           <input data-nh="drm-sysid" value="${esc(nh.drm?.system_id || "")}" placeholder="4266" style="width:180px"></div>
         <div class="row"><span class="prof grow">DRM Vendor</span>
           <input data-nh="drm-vendor" value="${esc(nh.drm?.vendor || "")}" placeholder="Google" style="width:180px"></div>
+
         <div class="prof" style="margin-top:8px; color:#10b981">📍 Geolocation &amp; Cell (PRO Tier)</div>
         <div class="row"><span class="prof grow">Latitude</span>
-          <input data-nh="loc-lat" type="number" step="any" value="${nh.location?.latitude ?? ""}" placeholder="37.7749" style="width:180px"></div>
+          <input data-nh="lat" value="${esc(nh.location?.latitude ?? "")}" placeholder="37.7749" style="width:180px"></div>
         <div class="row"><span class="prof grow">Longitude</span>
-          <input data-nh="loc-lng" type="number" step="any" value="${nh.location?.longitude ?? ""}" placeholder="-122.4194" style="width:180px"></div>
-        <div class="row"><span class="prof grow">Cell LAC / CID</span>
-          <div class="row" style="margin:0; width:180px; gap:4px">
-            <input data-nh="loc-lac" type="number" value="${nh.location?.lac ?? ""}" placeholder="LAC" style="width:88px">
-            <input data-nh="loc-cid" type="number" value="${nh.location?.cid ?? ""}" placeholder="CID" style="width:88px">
-          </div>
-        </div>
-        <div class="prof" style="margin-top:8px">⚙️ System &amp; Uptime</div>
-        <div class="row"><span class="prof grow">Uptime offset (sec)</span>
-          <input data-nh="uptime" type="number" value="${nh.uptime_offset_sec ?? ""}" placeholder="e.g. 172800" style="width:180px"></div>
-        <div class="row"><span class="prof grow">uname machine</span>
+          <input data-nh="lon" value="${esc(nh.location?.longitude ?? "")}" placeholder="-122.4194" style="width:180px"></div>
+        <div class="row"><span class="prof grow">Cell Tower LAC</span>
+          <input data-nh="cell-lac" value="${esc(nh.location?.lac || "")}" placeholder="12345" style="width:180px"></div>
+        <div class="row"><span class="prof grow">Cell Tower CID</span>
+          <input data-nh="cell-cid" value="${esc(nh.location?.cid || "")}" placeholder="67890" style="width:180px"></div>
+
+        <div class="prof" style="margin-top:8px; color:#9a9ab0">⏱️ Low-level System &amp; Uptime</div>
+        <div class="row"><span class="prof grow">Uptime offset (seconds)</span>
+          <input data-nh="uptime" type="number" value="${esc(nh.uptime_offset_sec ?? "")}" placeholder="0" style="width:180px"></div>
+        <div class="row"><span class="prof grow">Kernel machine (uname)</span>
           <input data-nh="machine" value="${esc(nh.uname?.machine || "")}" placeholder="aarch64" style="width:180px"></div>
-        <div class="row"><span class="prof grow">uname sysname</span>
+        <div class="row"><span class="prof grow">Kernel sysname (uname)</span>
           <input data-nh="sysname" value="${esc(nh.uname?.sysname || "")}" placeholder="Linux" style="width:180px"></div>
-        <div class="prof" style="margin-top:6px">Prop overrides</div>
+
+        <div class="prof" style="margin-top:8px; color:#9a9ab0">Custom system properties (__system_property_get)</div>
         <div data-props></div>
-        <div class="row"><button data-addprop>Add prop</button></div>
+        <div class="row"><button data-addprop class="grow" style="background:#27273a">+ Add property</button></div>
       </details>`;
-    const q = s => d.querySelector(s);
-    const onch = (s, fn) => { const el = q(s); if (el) el.onchange = fn; };
-    nh.id ||= {}; nh.telephony ||= {}; nh.drm ||= {}; nh.location ||= {};
+
+    const q = sel => d.querySelector(sel);
+    const onch = (sel, fn) => {
+      const el = q(sel);
+      if (el) el.onchange = fn;
+    };
+
+    // Preset application
+    q('[data-apply-preset]').onchange = e => {
+      const val = e.target.value;
+      if (!val) return;
+      applyPresetToProfile(p, val);
+      render();
+      log(`applied preset ${val} to profile ${k}`, "ok");
+    };
+
+    // Delete profile
+    q('[data-del-profile]').onclick = () => {
+      delete cfg.profiles[k];
+      for (const [pkg, prof] of Object.entries(cfg.apps)) {
+        if (prof === k) delete cfg.apps[pkg];
+      }
+      render();
+      log(`deleted profile ${k}`, "ok");
+    };
+
+    // Build fields
+    ['MANUFACTURER', 'MODEL', 'BRAND', 'DEVICE', 'PRODUCT', 'BOARD', 'HARDWARE', 'FINGERPRINT', 'RELEASE'].forEach(bf => {
+      onch(`[data-bf="${bf}"]`, e => { p[bf] = e.target.value.trim(); });
+    });
+    onch('[data-bf="SDK_INT"]', e => {
+      const num = parseInt(e.target.value, 10);
+      p.SDK_INT = isNaN(num) ? 0 : num;
+    });
+
+    // Native & PRO hooks
     onch('[data-nh="android-id"]', e => {
       nh.id.android_id = e.target.value.trim();
       if (!nh.id.android_id) delete nh.id.android_id;
@@ -194,34 +354,6 @@ function render() {
       nh.id.gaid = e.target.value.trim();
       if (!nh.id.gaid) delete nh.id.gaid;
     });
-    onch('[data-nh="drm-sec"]', e => {
-      nh.drm.security_level = e.target.value;
-      if (!nh.drm.security_level) delete nh.drm.security_level;
-    });
-    onch('[data-nh="drm-sysid"]', e => {
-      nh.drm.system_id = e.target.value.trim();
-      if (!nh.drm.system_id) delete nh.drm.system_id;
-    });
-    onch('[data-nh="drm-vendor"]', e => {
-      nh.drm.vendor = e.target.value.trim();
-      if (!nh.drm.vendor) delete nh.drm.vendor;
-    });
-    onch('[data-nh="loc-lat"]', e => {
-      const v = parseFloat(e.target.value);
-      if (isNaN(v)) delete nh.location.latitude; else nh.location.latitude = v;
-    });
-    onch('[data-nh="loc-lng"]', e => {
-      const v = parseFloat(e.target.value);
-      if (isNaN(v)) delete nh.location.longitude; else nh.location.longitude = v;
-    });
-    onch('[data-nh="loc-lac"]', e => {
-      const v = parseInt(e.target.value, 10);
-      if (isNaN(v)) delete nh.location.lac; else nh.location.lac = v;
-    });
-    onch('[data-nh="loc-cid"]', e => {
-      const v = parseInt(e.target.value, 10);
-      if (isNaN(v)) delete nh.location.cid; else nh.location.cid = v;
-    });
     onch('[data-nh="imei"]', e => {
       nh.telephony.imei = e.target.value.trim();
       if (!nh.telephony.imei) delete nh.telephony.imei;
@@ -233,6 +365,34 @@ function render() {
     onch('[data-nh="sim-name"]', e => {
       nh.telephony.sim_operator_name = e.target.value.trim();
       if (!nh.telephony.sim_operator_name) delete nh.telephony.sim_operator_name;
+    });
+    onch('[data-nh="drm-sec"]', e => {
+      nh.drm.security_level = e.target.value;
+      if (!nh.drm.security_level) delete nh.drm.security_level;
+    });
+    onch('[data-nh="drm-sysid"]', e => {
+      const val = parseInt(e.target.value, 10);
+      if (isNaN(val)) delete nh.drm.system_id; else nh.drm.system_id = val;
+    });
+    onch('[data-nh="drm-vendor"]', e => {
+      nh.drm.vendor = e.target.value.trim();
+      if (!nh.drm.vendor) delete nh.drm.vendor;
+    });
+    onch('[data-nh="lat"]', e => {
+      const v = parseFloat(e.target.value);
+      if (isNaN(v)) delete nh.location.latitude; else nh.location.latitude = v;
+    });
+    onch('[data-nh="lon"]', e => {
+      const v = parseFloat(e.target.value);
+      if (isNaN(v)) delete nh.location.longitude; else nh.location.longitude = v;
+    });
+    onch('[data-nh="cell-lac"]', e => {
+      const v = parseInt(e.target.value, 10);
+      if (isNaN(v)) delete nh.location.lac; else nh.location.lac = v;
+    });
+    onch('[data-nh="cell-cid"]', e => {
+      const v = parseInt(e.target.value, 10);
+      if (isNaN(v)) delete nh.location.cid; else nh.location.cid = v;
     });
     onch('[data-nh="gpu-renderer"]', e => {
       nh.gpu.renderer = e.target.value.trim();
@@ -258,6 +418,7 @@ function render() {
       nh.uname.sysname = e.target.value.trim();
       if (!nh.uname.sysname) delete nh.uname.sysname;
     });
+
     const propsBox = q('[data-props]');
     const renderProps = () => {
       propsBox.innerHTML = "";
@@ -286,6 +447,8 @@ function render() {
 }
 
 document.getElementById("filter").oninput = render;
+
+// Add App Assignment
 document.getElementById("add").onclick = () => {
   const pkg = document.getElementById("pkg").value.trim();
   const key = document.getElementById("newProfile").value;
@@ -296,6 +459,36 @@ document.getElementById("add").onclick = () => {
   render();
   log(`added ${pkg} → ${key}`, "ok");
 };
+
+// Add Profile with optional preset
+document.getElementById("addProfBtn").onclick = () => {
+  const name = document.getElementById("newProfName").value.trim();
+  const presetKey = document.getElementById("newProfPreset").value;
+  if (!name) return log("enter a profile name", "err");
+  if (cfg.profiles[name]) return log(`profile '${name}' already exists`, "err");
+  
+  cfg.profiles[name] = {
+    MANUFACTURER: "Google",
+    MODEL: name,
+    BRAND: "google",
+    DEVICE: name.toLowerCase(),
+    PRODUCT: name.toLowerCase(),
+    BOARD: name.toLowerCase(),
+    HARDWARE: name.toLowerCase(),
+    FINGERPRINT: `google/${name.toLowerCase()}/${name.toLowerCase()}:14/UP1A.231005.007/1:user/release-keys`,
+    SDK_INT: 34,
+    RELEASE: "14",
+    native_hooks: {}
+  };
+  if (presetKey) {
+    applyPresetToProfile(cfg.profiles[name], presetKey);
+  }
+  document.getElementById("newProfName").value = "";
+  render();
+  log(`created profile '${name}'${presetKey ? ` from preset ${presetKey}` : ''}`, "ok");
+};
+
+// Save config
 document.getElementById("save").onclick = async () => {
   const btn = document.getElementById("save");
   btn.disabled = true;
@@ -316,7 +509,7 @@ document.getElementById("save").onclick = async () => {
                      nh.gpu || nh.telephony || nh.id || nh.drm || nh.location;
       if (!hasAny) delete p.native_hooks;
     }
-    // Atomic write: heredoc to tmp, then move into place.
+    // Atomic write: base64 -> tmp -> mv
     const body = JSON.stringify(cfg, null, 2);
     const b64 = btoa(unescape(encodeURIComponent(body)));
     await exec(`echo '${b64}' | base64 -d > ${MOD}/config.json.tmp && ` +
@@ -325,6 +518,7 @@ document.getElementById("save").onclick = async () => {
   } catch (e) { log("save failed: " + e.message, "err"); }
   btn.disabled = false;
 };
+
 load();
 </script>
 </body>

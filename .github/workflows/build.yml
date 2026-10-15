@@ -1,0 +1,51 @@
+name: Build OpenSpoof
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Zygisk Module
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Android NDK (r27b)
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r27b
+          link-to-sdk: true
+
+      - name: Install Build Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build zip curl
+
+      - name: Build Dobby (ARM64 Static Library)
+        run: |
+          chmod +x scripts/build_dobby.sh
+          ./scripts/build_dobby.sh
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+
+      - name: Build & Package OpenSpoof Module
+        run: |
+          chmod +x scripts/build.sh
+          ./scripts/build.sh 0.2.0
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+
+      - name: Upload Flashable Module Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openspoof-module
+          path: openspoof-v*.zip
+          if-no-files-found: error

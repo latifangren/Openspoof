@@ -6,7 +6,7 @@
 #include "core/arch/arm/registers-arm.h"
 #include "core/assembler/assembler.h"
 
-#include "MemoryAllocator/CodeBuffer/code_buffer_arm.h"
+#include "MemoryAllocator/CodeMemBuffer.h"
 
 enum ref_label_type_t { kLdrLiteral };
 

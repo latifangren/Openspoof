@@ -73,10 +73,39 @@ int fake_uname(struct utsname* buf) {
     return r;
 }
 
-// --- F4c: __system_property_get ---------------------------------------------------
+// --- F4c: __system_property_get & __system_property_read_callback --------------
 // Hot path: single map lookup, straight through to the original otherwise.
 static int (*orig_system_property_get)(const char*, char*) = nullptr;
 static std::map<std::string, std::string> g_props;
+
+typedef void (*prop_read_callback_fn)(void* cookie, const char* name, const char* value, uint32_t serial);
+typedef void (*PFN_system_property_read_callback)(const void* pi, prop_read_callback_fn callback, void* cookie);
+static PFN_system_property_read_callback orig_system_property_read_callback = nullptr;
+
+struct PropCallbackWrapper {
+    prop_read_callback_fn orig_cb;
+    void* orig_cookie;
+};
+
+static void fake_prop_callback(void* cookie, const char* name, const char* value, uint32_t serial) {
+    auto* wrap = reinterpret_cast<PropCallbackWrapper*>(cookie);
+    if (!wrap || !wrap->orig_cb) return;
+    if (name != nullptr) {
+        auto it = g_props.find(name);
+        if (it != g_props.end()) {
+            wrap->orig_cb(wrap->orig_cookie, name, it->second.c_str(), serial);
+            return;
+        }
+    }
+    wrap->orig_cb(wrap->orig_cookie, name, value, serial);
+}
+
+void fake_system_property_read_callback(const void* pi, prop_read_callback_fn callback, void* cookie) {
+    if (!orig_system_property_read_callback) return;
+    if (!callback) return;
+    PropCallbackWrapper wrap{callback, cookie};
+    orig_system_property_read_callback(pi, fake_prop_callback, &wrap);
+}
 
 int fake_system_property_get(const char* name, char* value) {
     if (name == nullptr || value == nullptr) return 0;
@@ -205,6 +234,21 @@ void fake_vkGetPhysicalDeviceProperties(void* physicalDevice, void* pProperties)
     }
 }
 
+typedef void* (*PFN_vkGetInstanceProcAddr)(void* instance, const char* pName);
+static PFN_vkGetInstanceProcAddr orig_vkGetInstanceProcAddr = nullptr;
+
+void* fake_vkGetInstanceProcAddr(void* instance, const char* pName) {
+    if (pName != nullptr) {
+        if (strcmp(pName, "vkGetPhysicalDeviceProperties") == 0) {
+            return (void*)fake_vkGetPhysicalDeviceProperties;
+        }
+    }
+    if (orig_vkGetInstanceProcAddr != nullptr) {
+        return orig_vkGetInstanceProcAddr(instance, pName);
+    }
+    return nullptr;
+}
+
 // Helper: look up symbol in process or try explicitly loading companion library
 void* findSymbol(const char* libname, const char* sym) {
     void* addr = dlsym(RTLD_DEFAULT, sym);
@@ -293,13 +337,15 @@ bool InstallNativeHooks(const NativeHooks& h) {
         g_props["persist.sys.advertising_id"] = h.id.gaid;
     }
 
-    // F4c: __system_property_get (must be installed if custom props, telephony, location, or GAID configured)
+    // F4c: __system_property_get and __system_property_read_callback (modern Android)
     if (!h.props.empty() || h.telephony.enabled() || h.location.enabled() || (h.id.enabled() && !h.id.gaid.empty())) {
         for (const auto& kv : h.props) {
             g_props[kv.first] = kv.second;
         }
         any |= hookOne(nullptr, "__system_property_get", (void*)fake_system_property_get,
                        (void**)&orig_system_property_get, "__system_property_get");
+        any |= hookOne("libc.so", "__system_property_read_callback", (void*)fake_system_property_read_callback,
+                       (void**)&orig_system_property_read_callback, "__system_property_read_callback");
     }
 
     // Phase B: Hardware Identifiers (MAC address via ioctl)
@@ -326,6 +372,9 @@ bool InstallNativeHooks(const NativeHooks& h) {
         any |= hookOne("libvulkan.so", "vkGetPhysicalDeviceProperties",
                        (void*)fake_vkGetPhysicalDeviceProperties,
                        (void**)&orig_vkGetPhysicalDeviceProperties, "vkGetPhysicalDeviceProperties");
+        any |= hookOne("libvulkan.so", "vkGetInstanceProcAddr",
+                       (void*)fake_vkGetInstanceProcAddr,
+                       (void**)&orig_vkGetInstanceProcAddr, "vkGetInstanceProcAddr");
     }
 
     return any;

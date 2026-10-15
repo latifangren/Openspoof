@@ -1,6 +1,8 @@
 #pragma once
 
 #include <sys/types.h>
+#include <sys/mman.h>
+#include <unistd.h>
 #include <stddef.h>
 #include "pac_kit.h"
 
@@ -36,10 +38,14 @@ template <typename T> inline T arm64e_pac_strip_and_sign(T &addr) {
 namespace android {
 inline void make_memory_readable(void *address, size_t size) {
 #if defined(ANDROID)
-  auto page = (void *)ALIGN_FLOOR(address, OSMemory::PageSize());
-  if (!OSMemory::SetPermission(page, OSMemory::PageSize(), kReadExecute)) {
-    return;
+  long pagesize = sysconf(_SC_PAGESIZE);
+  if (pagesize > 0) {
+    void *page = (void *)((uintptr_t)address & ~(pagesize - 1));
+    mprotect(page, (size_t)pagesize, PROT_READ | PROT_EXEC);
   }
+#else
+  (void)address;
+  (void)size;
 #endif
 }
 } // namespace android

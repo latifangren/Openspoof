@@ -132,6 +132,14 @@ struct Profile {
 //         user takes responsibility for the softloop risk.
 enum class VersionPolicy { Never, Rom, Force };
 
+// Compatibility alias: keep the type reachable under openspoof_json:: for
+// host tests and any third-party consumer that imports it from there.
+// Defined in its own namespace block so it does not interact with the
+// later openspoof_json namespace (used for the JSON parser).
+namespace openspoof_json {
+    using VersionPolicy = ::VersionPolicy;
+}
+
 struct Config {
     std::map<std::string, Profile> profiles;  // profile key -> profile
     std::map<std::string, std::string> apps;   // package name -> profile key

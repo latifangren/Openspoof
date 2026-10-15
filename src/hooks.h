@@ -7,7 +7,21 @@
 
 #include "config.h"
 
-#include <jni.h>
+// JNIEnv is referenced only as a pointer in this header's function
+// signatures, so a forward declaration is enough. We still pull in
+// the real header when it is available (NDK builds) so callers
+// that include this header and then use JNI types do not have to
+// repeat the include. Host-only test builds (CI runner) do not
+// have jni.h and the forward declaration is sufficient for them.
+#if defined(__has_include)
+#  if __has_include(<jni.h>)
+#    include <jni.h>
+#  else
+struct JNIEnv;
+#  endif
+#else
+struct JNIEnv;
+#endif
 
 #include <string>
 
